@@ -107,6 +107,7 @@ let MY_COMPANY = {
   approvalRequired: false,
   timesheetExtensions: '.xlsx,.xls,.pdf',
   twoFactorAuth: false,
+  salesPersons: [], // 営業担当者リスト
 };
 
 // ─── EMAIL TEMPLATES ─────────────────────────────────
@@ -1483,7 +1484,7 @@ function showEmployeePicker(type, contract, amount, tax, total, note) {
   // Override modal actions
   document.querySelector('.doc-modal-actions').innerHTML = `
     <button class="btn-outline" onclick="finalizeDoc()">✓ この内容で発行</button>
-    <button class="btn-outline" onclick="alert('PDFをダウンロードしました ✓')">📥 PDF</button>
+    <button class="btn-outline" onclick="printDoc()">🖨 印刷 / PDF保存</button>
     <button class="btn-outline" onclick="openEmailSend()">📧 メール</button>
     <button class="btn-ghost" onclick="closeModal('doc-modal')">閉じる</button>`;
 }
@@ -1509,6 +1510,32 @@ function selectEmployee(name, role, btnEl) {
 }
 
 function syncDocPreview() { refreshDocPreview(); }
+
+function printDoc() {
+  const preview = document.getElementById('doc-inner-preview');
+  if (!preview) { alert('先に帳票を表示してください'); return; }
+  const content = preview.innerHTML;
+  const win = window.open('', '_blank', 'width=800,height:1000');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>MIGI WORKS 帳票</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Noto Sans JP',sans-serif;font-size:11px;color:#111;background:#fff;padding:24px}
+  @media print{
+    body{padding:0}
+    @page{margin:15mm;size:A4}
+  }
+</style>
+</head><body>${content}
+<script>
+  window.onload = function() {
+    setTimeout(function(){ window.print(); }, 500);
+  };
+<\/script>
+</body></html>`);
+  win.document.close();
+}
 
 function finalizeDoc() {
   const s = window._docState;
@@ -2112,6 +2139,30 @@ function renderCompanySettings() {
   </div>
 </div>
 
+<!-- ⑧ 営業担当者リスト -->
+<div class="cs-section">
+  <div class="cs-section-title">
+    <svg viewBox="0 0 14 14" width="13" height="13"><circle cx="7" cy="5" r="2.5" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M2 12c0-2.761 2.239-5 5-5s5 2.239 5 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>
+    営業担当者リスト（契約登録時に選択できます）
+  </div>
+  <div class="cs-section-body">
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input class="input" id="cs-sp-input" placeholder="例: 原 辰徳" style="flex:1" onkeydown="if(event.key==='Enter'){addSalesPerson();event.preventDefault()}">
+      <button class="btn-primary btn-sm" onclick="addSalesPerson()">＋ 追加</button>
+    </div>
+    <div id="cs-sp-list" style="display:flex;flex-direction:column;gap:6px">
+      ${(c.salesPersons||[]).length === 0
+        ? '<div style="font-size:12px;color:var(--muted);padding:8px">まだ登録されていません</div>'
+        : (c.salesPersons||[]).map((p,i) => `
+          <div class="cs-sp-item" id="cssp-${i}" style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm)">
+            <svg viewBox="0 0 14 14" width="13" height="13" style="color:var(--muted)"><circle cx="7" cy="5" r="2.5" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M2 12c0-2.761 2.239-5 5-5s5 2.239 5 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>
+            <span style="flex:1;font-size:13px;font-weight:500">${escHtml(p)}</span>
+            <button onclick="removeSalesPerson(${i})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px;line-height:1" title="削除">×</button>
+          </div>`).join('')}
+    </div>
+  </div>
+</div>
+
 <div class="cs-save-bar">
   <button class="btn-ghost" onclick="showView('dashboard',document.querySelector('[data-view=dashboard]'))">キャンセル</button>
   <button class="btn-primary" onclick="saveCompanySettings()">変更を保存する</button>
@@ -2144,6 +2195,7 @@ function saveCompanySettings() {
     keepInvoiceOnDelete:document.getElementById('cs-keep-invoice')?.checked || false,
     approvalRequired:   document.getElementById('cs-approval')?.checked || false,
     twoFactorAuth:      document.getElementById('cs-2fa')?.checked || false,
+    salesPersons:       MY_COMPANY.salesPersons || [],
   };
   // Show saved toast
   const toast = document.createElement('div');
@@ -2151,6 +2203,46 @@ function saveCompanySettings() {
   toast.textContent = '✓ 自社情報を保存しました';
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2500);
+}
+
+function addSalesPerson() {
+  const inp = document.getElementById('cs-sp-input');
+  const name = inp?.value.trim();
+  if (!name) return;
+  if (!MY_COMPANY.salesPersons) MY_COMPANY.salesPersons = [];
+  if (MY_COMPANY.salesPersons.includes(name)) {
+    inp.value = '';
+    return;
+  }
+  MY_COMPANY.salesPersons.push(name);
+  inp.value = '';
+  // Re-render list
+  const list = document.getElementById('cs-sp-list');
+  if (list) {
+    list.innerHTML = MY_COMPANY.salesPersons.map((p,i) => `
+      <div class="cs-sp-item" id="cssp-${i}" style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm)">
+        <svg viewBox="0 0 14 14" width="13" height="13" style="color:var(--muted)"><circle cx="7" cy="5" r="2.5" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M2 12c0-2.761 2.239-5 5-5s5 2.239 5 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>
+        <span style="flex:1;font-size:13px;font-weight:500">${escHtml(p)}</span>
+        <button onclick="removeSalesPerson(${i})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px;line-height:1" title="削除">×</button>
+      </div>`).join('');
+  }
+}
+
+function removeSalesPerson(idx) {
+  if (!MY_COMPANY.salesPersons) return;
+  MY_COMPANY.salesPersons.splice(idx, 1);
+  // Re-render list
+  const list = document.getElementById('cs-sp-list');
+  if (list) {
+    list.innerHTML = MY_COMPANY.salesPersons.length === 0
+      ? '<div style="font-size:12px;color:var(--muted);padding:8px">まだ登録されていません</div>'
+      : MY_COMPANY.salesPersons.map((p,i) => `
+          <div class="cs-sp-item" id="cssp-${i}" style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm)">
+            <svg viewBox="0 0 14 14" width="13" height="13" style="color:var(--muted)"><circle cx="7" cy="5" r="2.5" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M2 12c0-2.761 2.239-5 5-5s5 2.239 5 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>
+            <span style="flex:1;font-size:13px;font-weight:500">${escHtml(p)}</span>
+            <button onclick="removeSalesPerson(${i})" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px;line-height:1" title="削除">×</button>
+          </div>`).join('');
+  }
 }
 
 // ─── CLIENTS VIEW & MODAL ────────────────────────────
@@ -2293,7 +2385,8 @@ function buildContractForm(p) {
   <div class="cf-two-col">
     <div class="form-row"><label>案件名 *</label><input class="input" id="cf-jobname" placeholder="例: SCRUMシステム開発支援"></div>
     <div class="form-row"><label>作業者名（エンジニア）*</label>
-      <select class="input" id="cf-engineer">${engineerOptions}</select>
+      <input class="input" id="cf-engineer" placeholder="例: 岡本 和真" list="cf-engineer-list">
+      <datalist id="cf-engineer-list">${ENGINEERS.map(e=>`<option value="${e.name}">`).join('')}</datalist>
     </div>
   </div>
   <div class="cf-two-col">
@@ -2302,9 +2395,14 @@ function buildContractForm(p) {
         <option>準委任契約</option><option>派遣契約</option>
       </select>
     </div>
-    <div class="form-row"><label>この契約の営業担当</label>
+    <div class="form-row"><label>この契約の営業担当
+      <button type="button" onclick="showView('company-settings',document.querySelector('[data-view=company-settings]'));closeModal('contract-modal')" style="margin-left:6px;font-size:10px;color:var(--blue);background:none;border:none;cursor:pointer;text-decoration:underline">担当者を登録 →</button>
+    </label>
       <select class="input" id="cf-sales-person">
-        ${USERS.map(u=>`<option>${u.name}（${u.role}）</option>`).join('')}
+        <option value="">— 選択してください —</option>
+        ${(MY_COMPANY.salesPersons||[]).length > 0
+          ? (MY_COMPANY.salesPersons||[]).map(p=>`<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('')
+          : '<option disabled style="color:#aaa">自社情報設定で担当者を登録してください</option>'}
       </select>
     </div>
   </div>
