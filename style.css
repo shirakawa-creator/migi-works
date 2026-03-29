@@ -171,8 +171,8 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 .modal-body{padding:22px}
 
 /* ===== INVOICE PAPER ===== */
-.doc-modal-inner{background:var(--card);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-lg);animation:modalIn .2s ease;max-height:90vh;display:flex;flex-direction:column}
-.doc-paper{padding:40px 44px;color:#111;background:#fff;overflow-y:auto;flex:1;min-width:560px}
+.doc-modal-inner{background:var(--card);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-lg);animation:modalIn .2s ease;max-height:92vh;display:flex;flex-direction:column;max-width:920px;width:96vw}
+.doc-paper{color:#111;background:var(--card);overflow-y:auto;flex:1;min-width:0;width:100%;padding:20px 24px}
 .doc-modal-actions{display:flex;gap:8px;padding:14px 20px;background:var(--card2);border-top:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;justify-content:center}
 .inv-logo{font-family:var(--font-display);font-size:22px;font-weight:800;color:var(--navy)}
 .inv-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px}
@@ -514,5 +514,4 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 .att-upload-mini-btn:hover{border-color:var(--acc);color:var(--acc);background:#e0f7f0}
 
 /* ===== DOC MODAL WITH EMPLOYEE PICKER ===== */
-.doc-modal-inner{max-width:900px;width:96vw}
-.doc-paper{min-width:0;width:100%;overflow-y:auto;max-height:calc(90vh - 80px)}
+/* doc-modal sizing handled above */

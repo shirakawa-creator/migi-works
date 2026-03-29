@@ -1478,8 +1478,10 @@ function showEmployeePicker(type, contract, amount, tax, total, note) {
 
   openModal('doc-modal');
 
-  // Render preview now that DOM is ready
-  refreshDocPreview();
+  // setTimeout ensures DOM is fully rendered before calling refreshDocPreview
+  setTimeout(() => {
+    refreshDocPreview();
+  }, 50);
 
   // Override modal actions
   document.querySelector('.doc-modal-actions').innerHTML = `
@@ -1513,27 +1515,50 @@ function syncDocPreview() { refreshDocPreview(); }
 
 function printDoc() {
   const preview = document.getElementById('doc-inner-preview');
-  if (!preview) { alert('先に帳票を表示してください'); return; }
+  if (!preview || !preview.innerHTML.trim()) {
+    alert('帳票プレビューが表示されていません。\n担当者を選択するか、会社名を入力してください。');
+    return;
+  }
   const content = preview.innerHTML;
-  const win = window.open('', '_blank', 'width=800,height:1000');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>MIGI WORKS 帳票</title>
+  const s = window._docState;
+  const title = s ? `MIGI_WORKS_${s.type}_${s.num}` : 'MIGI_WORKS_帳票';
+
+  const win = window.open('', '_blank');
+  if (!win) {
+    alert('ポップアップがブロックされています。\nブラウザのポップアップブロックを解除してください。');
+    return;
+  }
+  win.document.write(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Noto Sans JP',sans-serif;font-size:11px;color:#111;background:#fff;padding:24px}
-  @media print{
-    body{padding:0}
-    @page{margin:15mm;size:A4}
-  }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;font-size:11px;color:#111;background:#fff;padding:20mm 15mm}
+table{border-collapse:collapse}
+@media print{
+  body{padding:0;margin:0}
+  @page{margin:12mm 10mm;size:A4 portrait}
+  button{display:none!important}
+  .no-print{display:none!important}
+}
+.print-actions{text-align:center;margin-top:20px;padding:16px;background:#f5f5f5;border-radius:8px}
+.print-actions button{padding:10px 24px;margin:0 6px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-family:inherit}
+.btn-pdf{background:#0d1b35;color:#fff}
+.btn-close{background:#eee;color:#333}
 </style>
-</head><body>${content}
-<script>
-  window.onload = function() {
-    setTimeout(function(){ window.print(); }, 500);
-  };
-<\/script>
-</body></html>`);
+</head>
+<body>
+<div class="no-print print-actions">
+  <button class="btn-pdf" onclick="window.print()">🖨 印刷 / PDFとして保存</button>
+  <button class="btn-close" onclick="window.close()">閉じる</button>
+  <p style="font-size:10px;color:#888;margin-top:8px">「PDFとして保存」→ 印刷ダイアログで送信先を「PDFに保存」に変更してください</p>
+</div>
+${content}
+</body>
+</html>`);
   win.document.close();
 }
 
