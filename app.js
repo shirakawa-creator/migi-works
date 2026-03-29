@@ -318,7 +318,7 @@ const VIEW_TITLES = {
   team:'チーム管理', clients:'取引先一覧', 'company-settings':'自社情報設定',
 };
 const CTA_LABELS = {
-  dashboard:'＋ 新規契約', engineers:'＋ エンジニア登録', attendance:'一括リマインド送信',
+  dashboard:'＋ 新規契約', engineers:'＋ エンジニア登録', attendance:'',
   contracts:'＋ 新規契約', billing:'契約を選択して計算', invoices:'＋ 新規作成',
   documents:'＋ 新規作成', sales:'＋ 案件登録', 'email-templates':'＋ テンプレート追加',
   team:'＋ メンバー招待', clients:'＋ 取引先登録', 'company-settings':'保存する',
@@ -327,7 +327,14 @@ const CTA_LABELS = {
 function showView(view, el) {
   STATE.currentView = view;
   document.getElementById('page-title').textContent = VIEW_TITLES[view] || view;
-  document.getElementById('topbar-cta').textContent = CTA_LABELS[view] || '＋ 新規作成';
+  const ctaBtn = document.getElementById('topbar-cta');
+  const ctaLabel = CTA_LABELS[view];
+  if (!ctaLabel) {
+    ctaBtn.style.display = 'none';
+  } else {
+    ctaBtn.style.display = '';
+    ctaBtn.textContent = ctaLabel;
+  }
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
   if (el) el.classList.add('active');
   const ca = document.getElementById('content-area');
@@ -359,7 +366,24 @@ function initViewBindings(view) {
 const VIEWS = {
 
   // ── DASHBOARD ──────────────────────────────────────
-  dashboard: () => `
+  dashboard: () => {
+    const today = new Date();
+    const thisYear  = today.getFullYear();
+    const thisMonth = today.getMonth() + 1; // 1-12
+
+    // 「来月末が契約終了」= 今月中に確認が必要
+    const nextYear  = thisMonth === 12 ? thisYear + 1 : thisYear;
+    const nextMonth = thisMonth === 12 ? 1 : thisMonth + 1;
+    const nextYM    = `${nextYear}-${String(nextMonth).padStart(2,'0')}`;
+
+    // 確認が必要な契約：終了月が来月 かつ 未確認
+    const needConfirm = CONTRACTS.filter(c => c.end.startsWith(nextYM) && c.extendStatus === '未確認');
+    // 確認済み（延長する・延長しない含む）
+    const alreadyDone = CONTRACTS.filter(c => c.end.startsWith(nextYM) && c.extendStatus !== '未確認');
+
+    const deadlineLabel = `${thisMonth}月末締め切り（${nextMonth}月末終了契約）`;
+
+    return `
 <div class="stat-grid g-2">
   <div class="stat-card">
     <div class="stat-label">契約総数</div>
@@ -368,25 +392,47 @@ const VIEWS = {
   </div>
   <div class="stat-card">
     <div class="stat-label">延長確認待ち</div>
-    <div class="stat-val" style="color:var(--gold)">${CONTRACTS.filter(c=>c.extendStatus==='未確認').length}</div>
-    <div class="stat-sub trend-dn">今月末締め切り</div>
+    <div class="stat-val" style="color:var(--gold)">${needConfirm.length}</div>
+    <div class="stat-sub trend-dn">${deadlineLabel}</div>
   </div>
 </div>
 
 <div class="card">
   <div class="card-header">
-    <div class="card-title">⚠ 延長確認 — 今月末締め切り</div>
+    <div class="card-title">⚠ 延長確認 — ${deadlineLabel}</div>
     <div class="card-actions">
-      <button class="btn-outline btn-sm" onclick="alert('3名に延長確認メールを一括送信しました ✓')">一括メール送信</button>
+      <button class="btn-outline btn-sm" onclick="alert('${needConfirm.length}名に延長確認メールを一括送信しました ✓')">一括メール送信</button>
     </div>
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>エンジニア</th><th>現在の現場</th><th>契約終了</th><th>確認状況</th><th>操作</th></tr></thead>
+      <thead><tr><th>エンジニア</th><th>案件名</th><th>契約終了</th><th>確認状況</th><th>操作</th></tr></thead>
       <tbody>
-        <tr><td>岡本 和真</td><td>株式会社テックコア</td><td>2024-10-31</td><td><span class="badge b-amber">返答待ち</span></td><td><button class="btn-outline btn-sm" onclick="openEmailSendFor('extend-confirm','岡本 和真','テックコア')">メール送信</button></td></tr>
-        <tr><td>丸 佳浩</td><td>フューチャーウェブ</td><td>2024-10-31</td><td><span class="badge b-green">延長確認済</span></td><td><button class="btn-outline btn-sm">メール送信</button></td></tr>
-        <tr><td>菅野 智之</td><td>ビッグデータラボ</td><td>2024-10-31</td><td><span class="badge b-red">要対応</span></td><td><button class="btn-danger btn-sm" onclick="openEmailSendFor('extend-confirm','菅野 智之','BDL')">緊急メール</button></td></tr>
+        ${needConfirm.length === 0 && alreadyDone.length === 0
+          ? `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">来月末（${nextMonth}月）に終了する契約はありません</td></tr>`
+          : [
+              ...needConfirm.map(c => `
+              <tr>
+                <td><strong>${c.engineer}</strong></td>
+                <td>${c.name}</td>
+                <td>${c.end}</td>
+                <td><span class="badge b-amber">未確認</span></td>
+                <td class="td-actions">
+                  <button class="btn-outline btn-sm" onclick="openEmailSendFor('extend-confirm','${c.engineer}','${c.clientUpper}')">メール送信</button>
+                  <button class="btn-outline btn-sm" onclick="openExtendModal('${c.id}')">延長する</button>
+                </td>
+              </tr>`),
+              ...alreadyDone.map(c => `
+              <tr>
+                <td><strong>${c.engineer}</strong></td>
+                <td>${c.name}</td>
+                <td>${c.end}</td>
+                <td>${c.extendStatus === '延長する'
+                  ? '<span class="badge b-green">延長確認済</span>'
+                  : '<span class="badge b-gray">延長しない</span>'}</td>
+                <td><button class="btn-outline btn-sm" onclick="setExtendStatus('${c.id}','未確認')">未確認に戻す</button></td>
+              </tr>`)
+            ].join('')}
       </tbody>
     </table>
   </div>
@@ -417,7 +463,8 @@ const VIEWS = {
       </tbody>
     </table>
   </div>
-</div>`,
+</div>`;
+  },
 
   // ── ENGINEERS ──────────────────────────────────────
   engineers: () => `
@@ -713,9 +760,6 @@ function renderAttendanceView() {
   <div class="att-toolbar-btns">
     <button class="btn-outline btn-sm" onclick="alert('初期表示の年月を変更します')">
       📅 初期表示の年月を変更する
-    </button>
-    <button class="btn-primary btn-sm" onclick="alert('${month}月の未送付の稼働表アップロードURLを一括送信しました ✓')">
-      📤 ${month}月の未送付の稼働表アップロードURLを一括で送信する
     </button>
     <button class="btn-outline btn-sm" onclick="alert('稼働表を一括ダウンロードしました ✓')">
       📥 稼働表一括ダウンロード
@@ -2244,7 +2288,7 @@ function renderCompanySettings() {
       <div class="cs-field">
         <div class="cs-label">締め日</div>
         <select class="input" id="cs-closing">
-          ${['末日','15日','20日','25日','その他'].map(d=>`<option ${c.closingDay===d?'selected':''}>${d}</option>`).join('')}
+          ${['1日締め','5日締め','10日締め','15日締め','20日締め','25日締め','月末締め'].map(d=>`<option ${c.closingDay===d?'selected':''}>${d}</option>`).join('')}
         </select>
       </div>
     </div>
@@ -2411,7 +2455,7 @@ function saveCompanySettings() {
     bankAccount1:       document.getElementById('cs-bank1')?.value || '',
     bankAccount2:       document.getElementById('cs-bank2')?.value || '',
     settlementUnit:     document.getElementById('cs-settlement')?.value || '月',
-    closingDay:         document.getElementById('cs-closing')?.value || '末日',
+    closingDay:         document.getElementById('cs-closing')?.value || '月末締め',
     paymentSite:        document.getElementById('cs-paysite')?.value || '30',
     ccMailList:         document.getElementById('cs-cc')?.value || '',
     bccMailList:        document.getElementById('cs-bcc')?.value || '',
@@ -2643,13 +2687,17 @@ function buildContractForm(p) {
   <div class="cf-two-col">
     <div class="form-row"><label>締日</label>
       <select class="input" id="cf-closing">
-        <option>末日</option><option>15日</option><option>20日</option><option>25日</option><option>その他</option>
+        <option value="1">1日締め</option>
+        <option value="5">5日締め</option>
+        <option value="10">10日締め</option>
+        <option value="15">15日締め</option>
+        <option value="20">20日締め</option>
+        <option value="25">25日締め</option>
+        <option value="末日" selected>月末締め</option>
       </select>
     </div>
     <div class="form-row"><label>書類発行日</label>
-      <select class="input" id="cf-issue-day">
-        <option>締日翌月1日</option><option>締日翌月5日</option><option>締日翌月10日</option><option>契約開始日</option>
-      </select>
+      <input type="date" class="input" id="cf-issue-day">
     </div>
   </div>
 </div>
@@ -2683,7 +2731,7 @@ function buildContractForm(p) {
       </div>
       <div class="form-row"><label>精算単位（分）</label>
         <select class="input" id="cf-upper-unit" onchange="calcContractRates('upper')">
-          <option value="60">60分（1時間単位）</option><option value="30">30分</option><option value="15">15分</option><option value="1">1分</option>
+          <option value="60">60分（1時間単位）</option><option value="30">30分</option><option value="15">15分</option><option value="10">10分</option><option value="1">1分</option>
         </select>
       </div>
       <div class="form-row"><label>契約単価（円）</label>
@@ -2721,7 +2769,7 @@ function buildContractForm(p) {
       </div>
       <div class="form-row"><label>精算単位（分）</label>
         <select class="input" id="cf-lower-unit" onchange="calcContractRates('lower')">
-          <option value="60">60分（1時間単位）</option><option value="30">30分</option><option value="15">15分</option><option value="1">1分</option>
+          <option value="60">60分（1時間単位）</option><option value="30">30分</option><option value="15">15分</option><option value="10">10分</option><option value="1">1分</option>
         </select>
       </div>
       <div class="form-row"><label>契約単価（円）</label>
