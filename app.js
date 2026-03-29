@@ -751,24 +751,19 @@ function renderAttCard(c, year, month) {
   const st = attStatus(d);
   const cardClass = st==='confirmed' ? 'att-card-confirmed' : st==='inputted' ? 'att-card-inputted' : '';
 
-  // 稼働時間表示
   const hoursStr = d.hours !== '' ? `${d.hours}時間${d.minutes||0}分` : '未入力';
-  // 請求日（締め日）
   const closingDay = MY_COMPANY.closingDay || '末日';
   const billDate = `${year}年${String(month).padStart(2,'0')}月${closingDay}`;
-  // 超過日数（stub）
   const overDays = 0;
-  // 契約種別
   const contractType = '精算契約';
-  // 請求額（上位）
   const billUpper = c.monthly ? `${c.monthly.toLocaleString()}円` : '—';
-  // 支払期限（翌月1日）
   const nextM = month === 12 ? 1 : month + 1;
   const nextY = month === 12 ? year + 1 : year;
   const payDate = `${String(nextY).slice(2)}/${String(nextM).padStart(2,'0')}/01`;
-  // 支払額（下位）
   const billLower = c.clientLowerMonthly ? `${c.clientLowerMonthly.toLocaleString()}円` : '0円';
   const payDateLower = `${String(nextY).slice(2)}/${String(nextM).padStart(2,'0')}/08`;
+  const isConfirmed = st === 'confirmed';
+  const dis = isConfirmed ? 'disabled' : '';
 
   return `
 <div class="att-entry-card2 ${cardClass}" id="att-card-${c.id}">
@@ -785,7 +780,7 @@ function renderAttCard(c, year, month) {
     <div class="att2-meta-row"><span class="att2-lbl">書類番号</span><span style="color:var(--muted)">—</span></div>
     <div class="att2-meta-row"><span class="att2-lbl">稼働時間</span><span style="font-weight:600">${hoursStr}</span></div>
     <div class="att2-meta-row"><span class="att2-lbl">稼働日数</span><span>${overDays}日</span></div>
-    <div class="att2-meta-row"><span class="att2-lbl">自社の担当者</span>
+    <div class="att2-meta-row"><span class="att2-lbl">自社担当者</span>
       <span class="att-memo-icon" title="担当者メモ">
         <svg viewBox="0 0 14 14" width="11" height="11"><path d="M2 10V12h2l6-6-2-2-6 6zM11.7 3.3a1 1 0 0 0 0-1.4l-.6-.6a1 1 0 0 0-1.4 0L8.5 2.5l2 2 1.2-1.2z" fill="currentColor" opacity=".5"/></svg>
       </span>
@@ -810,6 +805,40 @@ function renderAttCard(c, year, month) {
     <div class="att2-party-row"><span class="att2-plbl">契約形態</span><span class="att2-pval">${contractType}</span></div>
     <div class="att2-party-row"><span class="att2-plbl">支払金額</span><span class="att2-pval ${c.clientLowerMonthly>0?'att2-amount':''}">${billLower}</span></div>
     <div class="att2-party-row"><span class="att2-plbl">支払期日</span><span class="att2-pval">${payDateLower}</span></div>
+  </div>
+
+  <!-- 稼働入力エリア -->
+  <div class="att2-input">
+    <div class="att2-input-title">稼働（所属先から回収）</div>
+    <div class="att2-input-label">稼働時間</div>
+    <div class="att2-time-row">
+      <input type="number" class="att2-num" id="h-${c.id}" min="0" max="300" placeholder="0" value="${d.hours}" ${dis} oninput="onAttInput('${c.id}')">
+      <span class="att2-unit">時間</span>
+      <input type="number" class="att2-num" id="m-${c.id}" min="0" max="59" placeholder="0" value="${d.minutes}" ${dis} oninput="onAttInput('${c.id}')">
+      <span class="att2-unit">分</span>
+    </div>
+    <div class="att2-money-row">
+      <div>
+        <div class="att2-input-label">立替経費（税込金額を入力）</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input type="number" class="att2-num att2-num-wide" id="ex-${c.id}" min="0" placeholder="0" value="${d.expense}" ${dis} oninput="onAttInput('${c.id}')">
+          <span class="att2-unit">円</span>
+        </div>
+      </div>
+      <div>
+        <div class="att2-input-label">雑費（税抜金額を入力）</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input type="number" class="att2-num att2-num-wide" id="misc-${c.id}" min="0" placeholder="0" value="${d.misc}" ${dis} oninput="onAttInput('${c.id}')">
+          <span class="att2-unit">円</span>
+        </div>
+      </div>
+    </div>
+    <div class="att2-footer">
+      ${isConfirmed
+        ? `<button class="att2-btn-reconfirm" onclick="unconfirmAtt('${c.id}')">再確定</button>
+           <span style="font-size:10px;color:var(--acc);font-weight:600">✓ 確定済み</span>`
+        : `<button class="att2-btn-confirm" onclick="confirmAtt('${c.id}')">確定</button>`}
+    </div>
   </div>
 
   <!-- 右：アクションボタン -->
