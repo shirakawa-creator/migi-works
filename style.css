@@ -517,7 +517,7 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 /* doc-modal sizing handled above */
 
 /* ===== ATT CARD V2 (SES WORKS style) ===== */
-.att-entry-card2{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);display:grid;grid-template-columns:190px 1fr 1fr 200px 140px;gap:0;box-shadow:var(--shadow);overflow:hidden;margin-bottom:10px;transition:border-color .15s}
+.att-entry-card2{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);display:grid;grid-template-columns:170px 1fr 1fr 220px 150px;gap:0;box-shadow:var(--shadow);overflow:hidden;margin-bottom:10px;transition:border-color .15s}
 .att-entry-card2:hover{border-color:var(--border2)}
 .att-entry-card2.att-card-confirmed{border-left:4px solid var(--acc)}
 .att-entry-card2.att-card-inputted{border-left:4px solid var(--blue)}
@@ -536,17 +536,19 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 .att2-amount{color:var(--navy);font-weight:700}
 
 /* 稼働入力エリア */
-.att2-input{padding:12px 12px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:8px;background:var(--card2)}
-.att2-input-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
-.att2-input-label{font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px}
-.att2-time-row{display:flex;align-items:center;gap:5px}
-.att2-money-row{display:flex;gap:10px}
-.att2-num{width:64px;padding:6px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;color:var(--ink);text-align:right;outline:none;background:var(--card);transition:border-color .12s}
+.att2-input{padding:12px 10px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:7px;background:var(--card2);min-width:0}
+.att2-input-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.att2-input-label{font-size:10px;color:var(--muted);font-weight:600;margin-bottom:2px}
+.att2-time-row{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}
+.att2-money-row{display:flex;flex-direction:column;gap:6px}
+.att2-money-item{display:flex;flex-direction:column;gap:2px}
+.att2-money-inp-row{display:flex;align-items:center;gap:4px}
+.att2-num{width:60px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;color:var(--ink);text-align:right;outline:none;background:var(--card);transition:border-color .12s}
 .att2-num:focus{border-color:var(--acc)}
 .att2-num:disabled{background:var(--bg);color:var(--muted);cursor:not-allowed}
-.att2-num-wide{width:90px}
-.att2-unit{font-size:11px;color:var(--muted);white-space:nowrap}
-.att2-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:4px;padding-top:8px;border-top:1px solid var(--border)}
+.att2-num-wide{width:80px}
+.att2-unit{font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+.att2-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:2px;padding-top:7px;border-top:1px solid var(--border)}
 .att2-btn-confirm{padding:7px 18px;background:var(--navy);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .12s}
 .att2-btn-confirm:hover{background:var(--navy3)}
 .att2-btn-reconfirm{padding:5px 10px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;cursor:pointer;transition:all .12s}

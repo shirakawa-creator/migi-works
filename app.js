@@ -818,16 +818,16 @@ function renderAttCard(c, year, month) {
       <span class="att2-unit">分</span>
     </div>
     <div class="att2-money-row">
-      <div>
-        <div class="att2-input-label">立替経費（税込金額を入力）</div>
-        <div style="display:flex;align-items:center;gap:4px">
+      <div class="att2-money-item">
+        <div class="att2-input-label">立替経費（税込）</div>
+        <div class="att2-money-inp-row">
           <input type="number" class="att2-num att2-num-wide" id="ex-${c.id}" min="0" placeholder="0" value="${d.expense}" ${dis} oninput="onAttInput('${c.id}')">
           <span class="att2-unit">円</span>
         </div>
       </div>
-      <div>
-        <div class="att2-input-label">雑費（税抜金額を入力）</div>
-        <div style="display:flex;align-items:center;gap:4px">
+      <div class="att2-money-item">
+        <div class="att2-input-label">雑費（税抜）</div>
+        <div class="att2-money-inp-row">
           <input type="number" class="att2-num att2-num-wide" id="misc-${c.id}" min="0" placeholder="0" value="${d.misc}" ${dis} oninput="onAttInput('${c.id}')">
           <span class="att2-unit">円</span>
         </div>
