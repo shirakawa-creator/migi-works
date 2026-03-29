@@ -1363,6 +1363,89 @@ function formatFileSize(bytes) {
   return (bytes/1024/1024).toFixed(1) + ' MB';
 }
 
+// ─── 書類発行設定モーダル ──────────────────────────────
+function openDocWithSettings(type, contractId) {
+  const c = CONTRACTS.find(x => x.id === contractId);
+  if (!c) return;
+
+  const today = new Date();
+  const yyyy  = today.getFullYear();
+  const mm    = String(today.getMonth() + 1).padStart(2, '0');
+  const dd    = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+  const no = {'見積書':'QUO','注文書':'ORD'}[type] || 'DOC';
+  const defaultNum = `${no}-${yyyy}-${String(Math.floor(Math.random()*900+100)).padStart(3,'0')}`;
+
+  if (!document.getElementById('doc-settings-modal')) {
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="modal-overlay hidden" id="doc-settings-modal" onclick="if(event.target===this)closeModal('doc-settings-modal')">
+        <div class="modal-card" style="width:440px">
+          <div class="modal-header">
+            <h3 id="doc-settings-title">書類発行設定</h3>
+            <button class="modal-close" onclick="closeModal('doc-settings-modal')">✕</button>
+          </div>
+          <div class="modal-body" id="doc-settings-body"></div>
+        </div>
+      </div>`;
+    document.body.appendChild(div.firstElementChild);
+  }
+
+  document.getElementById('doc-settings-title').textContent = `${type}の発行設定`;
+  document.getElementById('doc-settings-body').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-row">
+        <label>発行日 <span style="color:var(--coral)">*</span></label>
+        <input type="date" class="input" id="dss-issue-date" value="${todayStr}">
+      </div>
+      <div class="form-row">
+        <label>書類番号</label>
+        <input class="input" id="dss-doc-num" value="${defaultNum}" placeholder="${defaultNum}">
+      </div>
+      <div class="form-row">
+        <label>対象月</label>
+        <div style="display:flex;gap:8px">
+          <input type="number" class="input" id="dss-year" value="${yyyy}" min="2020" max="2099" style="width:80px">
+          <span style="line-height:38px;color:var(--muted)">年</span>
+          <input type="number" class="input" id="dss-month" value="${today.getMonth()+1}" min="1" max="12" style="width:60px">
+          <span style="line-height:38px;color:var(--muted)">月分</span>
+        </div>
+      </div>
+      ${type === '見積書' ? `
+      <div class="form-row">
+        <label>有効期限</label>
+        <input type="date" class="input" id="dss-valid-until">
+      </div>` : ''}
+      <div class="form-row">
+        <label>備考（帳票に反映）</label>
+        <textarea class="input" id="dss-note" rows="2" placeholder="特記事項があれば入力"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer" style="margin-top:20px">
+      <button class="btn-ghost" onclick="closeModal('doc-settings-modal')">キャンセル</button>
+      <button class="btn-primary" onclick="applyDocSettings('${type}','${contractId}')">
+        この設定で発行する →
+      </button>
+    </div>`;
+
+  openModal('doc-settings-modal');
+}
+
+function applyDocSettings(type, contractId) {
+  const issueDate  = document.getElementById('dss-issue-date')?.value || '';
+  const docNum     = document.getElementById('dss-doc-num')?.value || '';
+  const targetYear = parseInt(document.getElementById('dss-year')?.value) || new Date().getFullYear();
+  const targetMonth= parseInt(document.getElementById('dss-month')?.value) || new Date().getMonth()+1;
+  const note       = document.getElementById('dss-note')?.value || '';
+  const validUntil = document.getElementById('dss-valid-until')?.value || '';
+
+  // Store settings for use in buildDocInner
+  window._docIssueSettings = { issueDate, docNum, targetYear, targetMonth, note, validUntil };
+
+  closeModal('doc-settings-modal');
+  openDoc(type, contractId);
+}
+
 // ─── CONTRACTS MONTHLY VIEW ──────────────────────────
 function renderContractsView() {
   const { year, month } = CONTRACT_VIEW_STATE;
@@ -1445,7 +1528,14 @@ function renderContractCard(c) {
         isEndingThisMonth ? '<span class="extend-label ext-pending">当月終了</span>' : ''}
     </div>
     <div class="cc-actions">
-      <button class="btn-outline btn-sm" onclick="openDoc('請求書','${c.id}')">契約書を見る</button>
+      <button class="btn-outline btn-sm" onclick="openDocWithSettings('見積書','${c.id}')">
+        <svg viewBox="0 0 12 12" width="10" height="10"><rect x="1" y="1" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="3" y1="4" x2="9" y2="4" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><line x1="3" y1="7" x2="7" y2="7" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+        見積書
+      </button>
+      <button class="btn-outline btn-sm" onclick="openDocWithSettings('注文書','${c.id}')">
+        <svg viewBox="0 0 12 12" width="10" height="10"><rect x="1" y="1" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="3" y1="4" x2="9" y2="4" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><line x1="3" y1="7" x2="7" y2="7" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+        注文書
+      </button>
       ${extendBtnExtend}
       ${extendBtnNo}
       ${(c.extendStatus !== '未確認') ? extendBtnReset : ''}
@@ -1817,10 +1907,18 @@ function finalizeDoc() {
 
 function buildDocInner(type, color, num, client, item, amount, tax, total, note, contract) {
   const today  = new Date();
-  const yyyy   = today.getFullYear();
-  const mm     = today.getMonth() + 1;
+  const s      = window._docIssueSettings || {};
+  const yyyy   = s.targetYear  || today.getFullYear();
+  const mm     = s.targetMonth || today.getMonth() + 1;
   const dd     = today.getDate();
-  const issueDate = `${yyyy}年${mm}月${dd}日`;
+  // 発行日：設定モーダルの値 or 今日
+  const issueDate = s.issueDate
+    ? s.issueDate.replace(/-/g, '/').replace(/(\d{4})\/(\d{2})\/(\d{2})/, '$1年$2月$3日').replace(/年0/, '年').replace(/月0/, '月')
+    : `${yyyy}年${mm}月${dd}日`;
+  // 書類番号：設定モーダルの値 or 自動採番
+  const docNum = s.docNum || num;
+  // 備考：設定モーダルの値 or 引数
+  const finalNote = s.note || note || '';
   const co     = MY_COMPANY;
   const compName  = co.name    || 'MIGI WORKS';
   const compAddr  = co.address || '〒150-0011 東京都渋谷区東1丁目22番11号 THE FIRST SHIBUYA3F';
@@ -1844,9 +1942,9 @@ function buildDocInner(type, color, num, client, item, amount, tax, total, note,
   const taxAmt   = Math.round(taxableBase * 0.1);
   const grandTotal = taxableBase + expense + taxAmt;
 
-  if (type === '注文書') return buildOrderDoc(num, issueDate, client, compName, compAddr, engName, amount, grandTotal, overRate, underRate, minH, maxH, period, contract);
-  if (type === '見積書') return buildQuoteDoc(num, issueDate, client, compName, compAddr, compBank, engName, item, amount, tax, total, contract);
-  return buildInvoiceDoc(num, issueDate, dueDate, regNo, client, compName, compAddr, compBank, engName, workMonth, amount, overH, overRate, underH, underRate, amount, expense, misc, taxAmt, grandTotal, period, contract);
+  if (type === '注文書') return buildOrderDoc(docNum, issueDate, client, compName, compAddr, engName, amount, grandTotal, overRate, underRate, minH, maxH, period, contract);
+  if (type === '見積書') return buildQuoteDoc(docNum, issueDate, client, compName, compAddr, compBank, engName, item, amount, tax, total, contract);
+  return buildInvoiceDoc(docNum, issueDate, dueDate, regNo, client, compName, compAddr, compBank, engName, workMonth, amount, overH, overRate, underH, underRate, amount, expense, misc, taxAmt, grandTotal, period, contract);
 }
 
 // ── 御請求書 ─────────────────────────────────────────
