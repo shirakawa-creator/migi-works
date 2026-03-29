@@ -749,102 +749,75 @@ function renderAttendanceView() {
 function renderAttCard(c, year, month) {
   const d = getAttData(c.id, year, month);
   const st = attStatus(d);
-  const statusLabel = st==='confirmed' ? '<span class="att-badge att-confirmed">確定済</span>'
-                    : st==='inputted'  ? '<span class="att-badge att-inputted">入力済</span>'
-                    : '<span class="att-badge att-uncollected">未回収</span>';
   const cardClass = st==='confirmed' ? 'att-card-confirmed' : st==='inputted' ? 'att-card-inputted' : '';
 
-  // Uploaded files summary
-  const files = d.uploadedFiles || [];
-  const hasTimesheetFile = files.some(f => f.type === 'timesheet');
-  const filesSummary = files.length > 0
-    ? `<div class="att-files-summary">
-        ${files.map(f => `
-          <div class="att-file-chip ${f.type}">
-            <svg viewBox="0 0 12 14" width="10" height="12" style="flex-shrink:0"><path d="M2 1h6l3 3v9a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.1" fill="none"/><path d="M8 1v3h3" stroke="currentColor" stroke-width="1.1" fill="none"/></svg>
-            <span>${f.name}</span>
-          </div>`).join('')}
-       </div>`
-    : '';
+  // 稼働時間表示
+  const hoursStr = d.hours !== '' ? `${d.hours}時間${d.minutes||0}分` : '未入力';
+  // 請求日（締め日）
+  const closingDay = MY_COMPANY.closingDay || '末日';
+  const billDate = `${year}年${String(month).padStart(2,'0')}月${closingDay}`;
+  // 超過日数（stub）
+  const overDays = 0;
+  // 契約種別
+  const contractType = '精算契約';
+  // 請求額（上位）
+  const billUpper = c.monthly ? `${c.monthly.toLocaleString()}円` : '—';
+  // 支払期限（翌月1日）
+  const nextM = month === 12 ? 1 : month + 1;
+  const nextY = month === 12 ? year + 1 : year;
+  const payDate = `${String(nextY).slice(2)}/${String(nextM).padStart(2,'0')}/01`;
+  // 支払額（下位）
+  const billLower = c.clientLowerMonthly ? `${c.clientLowerMonthly.toLocaleString()}円` : '0円';
+  const payDateLower = `${String(nextY).slice(2)}/${String(nextM).padStart(2,'0')}/08`;
 
   return `
-<div class="att-entry-card ${cardClass}" id="att-card-${c.id}">
-  <div class="att-entry-left">
-    <div class="att-entry-name">
-      <button class="att-name-btn" onclick="openUploadModal('${c.id}','${c.engineer}',${year},${month})">${c.engineer}</button>
-      <a class="att-link-icon" href="#" onclick="openUploadModal('${c.id}','${c.engineer}',${year},${month});return false" title="稼働表アップロードページを開く">
-        <svg viewBox="0 0 14 14" width="13" height="13"><path d="M6 3H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V8M9 1h4m0 0v4m0-4L6 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+<div class="att-entry-card2 ${cardClass}" id="att-card-${c.id}">
+  <!-- 左：エンジニア情報 -->
+  <div class="att2-left">
+    <div class="att2-name">
+      <button class="att-name-btn" onclick="openAttDetail('${c.id}',${year},${month})">${c.engineer}</button>
+      <a class="att-link-icon" href="#" onclick="openUploadModal('${c.id}','${c.engineer}',${year},${month});return false" title="稼働表アップロード">
+        <svg viewBox="0 0 14 14" width="12" height="12"><path d="M6 3H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V8M9 1h4m0 0v4m0-4L6 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
       </a>
     </div>
-    ${statusLabel}
-    ${hasTimesheetFile ? '<div class="att-has-file"><svg viewBox="0 0 12 12" width="10" height="10"><path d="M2 6.5l2.5 2.5L10 3" stroke="#166534" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> 稼働表 添付済</div>' : ''}
-    ${filesSummary}
-    <div class="att-entry-meta">
-      <div><span class="att-meta-lbl">契約期間</span>${c.start} - ${c.end}</div>
-      <div><span class="att-meta-lbl">自社の担当者</span>
-        <span class="att-memo-icon" title="メモを追加">
-          <svg viewBox="0 0 14 14" width="12" height="12"><path d="M2 10V12h2l6-6-2-2-6 6zM11.7 3.3a1 1 0 0 0 0-1.4l-.6-.6a1 1 0 0 0-1.4 0L8.5 2.5l2 2 1.2-1.2z" fill="currentColor" opacity=".4"/></svg>
-        </span>
-      </div>
+    <div class="att2-job">${c.name}</div>
+    <div class="att2-meta-row"><span class="att2-lbl">請求日</span><span>${billDate}</span></div>
+    <div class="att2-meta-row"><span class="att2-lbl">書類番号</span><span style="color:var(--muted)">—</span></div>
+    <div class="att2-meta-row"><span class="att2-lbl">稼働時間</span><span style="font-weight:600">${hoursStr}</span></div>
+    <div class="att2-meta-row"><span class="att2-lbl">稼働日数</span><span>${overDays}日</span></div>
+    <div class="att2-meta-row"><span class="att2-lbl">自社の担当者</span>
+      <span class="att-memo-icon" title="担当者メモ">
+        <svg viewBox="0 0 14 14" width="11" height="11"><path d="M2 10V12h2l6-6-2-2-6 6zM11.7 3.3a1 1 0 0 0 0-1.4l-.6-.6a1 1 0 0 0-1.4 0L8.5 2.5l2 2 1.2-1.2z" fill="currentColor" opacity=".5"/></svg>
+      </span>
     </div>
   </div>
 
-  <div class="att-entry-middle">
-    <div class="att-party-section">
-      <div class="att-party-lbl">提案先（上位）</div>
-      <div class="att-party-row"><span class="att-field-lbl">会社名</span><span class="att-field-val">${c.clientUpper}</span></div>
-      <div class="att-party-row"><span class="att-field-lbl">担当者</span><span class="att-field-val">${c.clientUpperDept||'—'}</span></div>
-    </div>
-    <div class="att-party-sep"></div>
-    <div class="att-party-section">
-      <div class="att-party-lbl">所属先（下位）</div>
-      <div class="att-party-row"><span class="att-field-lbl">会社名</span><span class="att-field-val">${c.clientLower}</span></div>
-      <div class="att-party-row"><span class="att-field-lbl">担当者</span><span class="att-field-val">${c.clientLowerDept||'—'}</span></div>
-    </div>
+  <!-- 中：提案先（上位）-->
+  <div class="att2-party">
+    <div class="att2-party-title">提案先（上位）</div>
+    <div class="att2-party-row"><span class="att2-plbl">会社名</span><span class="att2-pval">${c.clientUpper}</span></div>
+    <div class="att2-party-row"><span class="att2-plbl">担当者名</span><span class="att2-pval">${c.clientUpperDept||'—'}</span></div>
+    <div class="att2-party-row"><span class="att2-plbl">契約形態</span><span class="att2-pval">${contractType}</span></div>
+    <div class="att2-party-row"><span class="att2-plbl">請求金額</span><span class="att2-pval att2-amount">${billUpper}</span></div>
+    <div class="att2-party-row"><span class="att2-plbl">支払期日</span><span class="att2-pval">${payDate}</span></div>
   </div>
 
-  <div class="att-entry-right">
-    <div class="att-input-section-title">稼働（所属先から回収）</div>
-    <div class="att-input-row">
-      <div class="att-input-group">
-        <div class="att-input-label">稼働時間</div>
-        <div class="att-time-inputs">
-          <input type="number" class="att-input" id="h-${c.id}" min="0" max="300" placeholder="0"
-            value="${d.hours}" ${d.confirmed?'disabled':''} oninput="onAttInput('${c.id}')">
-          <span class="att-unit">時間</span>
-          <input type="number" class="att-input" id="m-${c.id}" min="0" max="59" placeholder="0"
-            value="${d.minutes}" ${d.confirmed?'disabled':''} oninput="onAttInput('${c.id}')">
-          <span class="att-unit">分</span>
-        </div>
-      </div>
-    </div>
-    <div class="att-input-row">
-      <div class="att-input-group">
-        <div class="att-input-label">立替経費（税込金額を入力）</div>
-        <div class="att-money-input">
-          <input type="number" class="att-input att-input-wide" id="ex-${c.id}" min="0" placeholder="0"
-            value="${d.expense}" ${d.confirmed?'disabled':''} oninput="onAttInput('${c.id}')">
-          <span class="att-unit">円</span>
-        </div>
-      </div>
-      <div class="att-input-group">
-        <div class="att-input-label">雑費（税抜金額を入力）</div>
-        <div class="att-money-input">
-          <input type="number" class="att-input att-input-wide" id="misc-${c.id}" min="0" placeholder="0"
-            value="${d.misc}" ${d.confirmed?'disabled':''} oninput="onAttInput('${c.id}')">
-          <span class="att-unit">円</span>
-        </div>
-      </div>
-    </div>
-    <div class="att-entry-footer">
-      <button class="att-upload-mini-btn" onclick="openUploadModal('${c.id}','${c.engineer}',${year},${month})">
-        <svg viewBox="0 0 14 14" width="12" height="12"><path d="M7 10V3M4 6l3-3 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="2" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        ファイル添付 ${files.length > 0 ? `(${files.length})` : ''}
-      </button>
-      ${st==='confirmed'
-        ? `<button class="btn-outline btn-sm" onclick="unconfirmAtt('${c.id}')">修正する</button>
-           <span class="att-confirmed-text">✓ 確定済み</span>`
-        : `<button class="att-confirm-btn" onclick="confirmAtt('${c.id}')">確定</button>`}
+  <!-- 中：所属先（下位）-->
+  <div class="att2-party">
+    <div class="att2-party-title">所属先（下位）</div>
+    <div class="att2-party-row"><span class="att2-plbl">会社名</span><span class="att2-pval">${c.clientLower}</span></div>
+    <div class="att2-party-row"><span class="att2-plbl">担当者名</span><span class="att2-pval">${c.clientLowerDept||'—'}</span></div>
+    <div class="att2-party-row"><span class="att2-plbl">契約形態</span><span class="att2-pval">${contractType}</span></div>
+    <div class="att2-party-row"><span class="att2-plbl">支払金額</span><span class="att2-pval ${c.clientLowerMonthly>0?'att2-amount':''}">${billLower}</span></div>
+    <div class="att2-party-row"><span class="att2-plbl">支払期日</span><span class="att2-pval">${payDateLower}</span></div>
+  </div>
+
+  <!-- 右：アクションボタン -->
+  <div class="att2-actions">
+    <button class="att2-btn-detail" onclick="openAttDetail('${c.id}',${year},${month})">詳細表示</button>
+    <div class="att2-pdf-wrap">
+      <button class="att2-btn-pdf" onclick="openAttPdfPreview('${c.id}',${year},${month})">PDFプレビュー</button>
+      <button class="att2-btn-pdf-arrow" onclick="openDocFromAtt('${c.id}','請求書',${year},${month})">▾</button>
     </div>
   </div>
 </div>`;
@@ -912,6 +885,204 @@ function changeAttMonth(year, month) {
 }
 
 function attFilter() { /* フィルター機能プレースホルダー */ }
+
+// ─── ATT DETAIL MODAL ────────────────────────────────
+function openAttDetail(contractId, year, month) {
+  const c = CONTRACTS.find(x => x.id === contractId);
+  if (!c) return;
+  const d = getAttData(contractId, year, month);
+  const hoursStr = d.hours !== '' ? `${d.hours}時間${d.minutes||0}分` : '未入力';
+  const overH = 0, underH = 0;
+  const expense = d.expense || 0;
+  const misc = d.misc || 0;
+  const nextM = month===12?1:month+1, nextY = month===12?year+1:year;
+  const payDate = `${nextY}年${String(nextM).padStart(2,'0')}月01日`;
+  const payDateLower = `${nextY}年${String(nextM).padStart(2,'0')}月08日`;
+
+  if (!document.getElementById('att-detail-modal')) {
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="modal-overlay hidden" id="att-detail-modal" onclick="if(event.target===this)closeModal('att-detail-modal')">
+        <div class="modal-card" style="width:720px;max-height:88vh;overflow-y:auto">
+          <div class="modal-header">
+            <h3 id="att-detail-title">請求概要</h3>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <button class="btn-primary btn-sm" id="att-detail-edit-btn">✏ 編集</button>
+              <button class="modal-close" onclick="closeModal('att-detail-modal')">✕</button>
+            </div>
+          </div>
+          <div class="modal-body" id="att-detail-body"></div>
+        </div>
+      </div>`;
+    document.body.appendChild(div.firstElementChild);
+  }
+
+  document.getElementById('att-detail-title').textContent = `${c.engineer} — ${year}年${month}月 請求概要`;
+  document.getElementById('att-detail-edit-btn').onclick = () => openUploadModal(contractId, c.engineer, year, month);
+
+  document.getElementById('att-detail-body').innerHTML = `
+    <div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:12px">
+      ${year}年${String(month).padStart(2,'0')}月 登録済み
+    </div>
+
+    <div class="detail-section-title">請求概要（共通）</div>
+    <div class="detail-grid-2">
+      <div class="detail-table">
+        ${detailRow('作業者', c.engineer)}
+        ${detailRow('作業内容', c.name)}
+        ${detailRow('自社の事務担当者', MY_COMPANY.accountManager||'—')}
+        ${detailRow('自社の営業担当者（提案先）', (MY_COMPANY.salesPersons||[])[0]||'—')}
+        ${detailRow('自社の営業担当者（所属先）', (MY_COMPANY.salesPersons||[])[0]||'—')}
+        ${detailRow('書類発行日', `${year}年${String(month).padStart(2,'0')}月${MY_COMPANY.closingDay||'末日'}`)}
+        ${detailRow('請求日', `${year}年${String(month).padStart(2,'0')}月${MY_COMPANY.closingDay||'末日'}`)}
+        ${detailRow('書類番号', '未設定')}
+      </div>
+      <div class="detail-table">
+        ${detailRow('作業時間', hoursStr)}
+        ${detailRow('立替経費（交通費等）', `${Number(expense).toLocaleString()}円`)}
+        ${detailRow('雑費', `${Number(misc).toLocaleString()}円`)}
+        ${detailRow('稼働日数', '0日')}
+        ${detailRow('超過時間合計', `${overH}時間 0分`)}
+        ${detailRow('控除時間合計', `${underH}時間 0分`)}
+      </div>
+    </div>
+
+    <div class="detail-grid-2" style="margin-top:18px">
+      <div>
+        <div class="detail-section-title">提案先（上位）への請求と企業情報</div>
+        <div class="detail-table">
+          ${detailRow('会社名', c.clientUpper)}
+          ${detailRow('担当者名', c.clientUpperDept||'—')}
+          ${detailRow('電話番号', '未設定')}
+          ${detailRow('FAX', '未設定')}
+          ${detailRow('郵便番号', '—')}
+          ${detailRow('本社所在地', '—')}
+          ${detailRow('請求金額', `${c.monthly.toLocaleString()}円`)}
+          ${detailRow('支払期限', payDate)}
+          ${detailRow('入金の有無', '未入金')}
+          ${detailRow('備考', '未設定')}
+        </div>
+      </div>
+      <div>
+        <div class="detail-section-title">所属先（下位）からの請求と企業情報</div>
+        <div class="detail-table">
+          ${detailRow('会社名', c.clientLower)}
+          ${detailRow('担当者名', c.clientLowerDept||'—')}
+          ${detailRow('電話番号', '未設定')}
+          ${detailRow('FAX', '未設定')}
+          ${detailRow('郵便番号', '—')}
+          ${detailRow('本社所在地', '—')}
+          ${detailRow('請求金額', `${c.clientLowerMonthly.toLocaleString()}円`)}
+          ${detailRow('支払期限', payDateLower)}
+          ${detailRow('支払いの有無', '未払い')}
+          ${detailRow('備考', '未設定')}
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-grid-2" style="margin-top:18px">
+      <div>
+        <div class="detail-section-title">提案先（上位）向け書類の発行</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn-outline btn-sm" onclick="closeModal('att-detail-modal');openDoc('請求書','${c.id}')">請求書</button>
+          <button class="btn-outline btn-sm" onclick="closeModal('att-detail-modal');openDoc('見積書','${c.id}')">見積書</button>
+          <button class="btn-outline btn-sm" onclick="closeModal('att-detail-modal');openDoc('注文書','${c.id}')">注文書</button>
+        </div>
+      </div>
+      <div>
+        <div class="detail-section-title">所属先（下位）向け書類の発行</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn-outline btn-sm" onclick="closeModal('att-detail-modal');openDoc('請求書','${c.id}')">請求書</button>
+          <button class="btn-outline btn-sm" onclick="closeModal('att-detail-modal');openDoc('注文書','${c.id}')">注文書</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('att-detail-modal')">閉じる</button>
+      <button class="btn-primary" onclick="openUploadModal('${c.id}','${c.engineer}',${year},${month});closeModal('att-detail-modal')">稼働表・ファイル管理</button>
+    </div>`;
+
+  openModal('att-detail-modal');
+}
+
+function detailRow(label, value) {
+  return `<div class="detail-row"><span class="detail-lbl">${label}</span><span class="detail-val">${value||'—'}</span></div>`;
+}
+
+function openAttPdfPreview(contractId, year, month) {
+  const c = CONTRACTS.find(x => x.id === contractId);
+  if (!c) return;
+  // Set up _docState and open invoice doc in print window directly
+  const amount = c.monthly;
+  const tax = Math.round(amount * 0.1);
+  const total = amount + tax;
+  window._docState = {
+    type: '請求書', color: '#0d1b35',
+    num: `INV-${year}-${String(Math.floor(Math.random()*900+100)).padStart(3,'0')}`,
+    defaultClient: c.clientUpper,
+    item: `${c.name}費（${year}年${month}月分）`,
+    amount, tax, total, note: '', contract: c, contractId
+  };
+  // Build HTML directly without picker UI
+  const d = getAttData(contractId, year, month);
+  const co = MY_COMPANY;
+  const compName = co.name || 'MIGI WORKS';
+  const compAddr = co.address || '〒150-0011 東京都渋谷区東1丁目22番11号 THE FIRST SHIBUYA3F';
+  const compBank = co.bankAccount1 || '三菱UFJ銀行(0005) 池袋支店(359) 普通 0683436\n三井住友銀行(0009) 渋谷駅前支店(234) 普通 5679825　カ)ミギナナメウエ';
+  const regNo = co.registrationNo || 'T1234567890123';
+  const today = new Date();
+  const issueDate = `${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
+  const nextM = month===12?1:month+1, nextY = month===12?year+1:year;
+  const dueDate = `${nextY}年${String(nextM).padStart(2,'0')}月1日`;
+  const workMonth = `${c.name}（${year}年${month}月分:${c.start.slice(5,7)}/01〜${c.end.slice(5,7)}/${new Date(year,month,0).getDate()}）`;
+  const hoursH = d.hours || c.minHours;
+  const hoursM = d.minutes || 0;
+  const expense = Number(d.expense)||0;
+  const misc = Number(d.misc)||0;
+  const taxAmt = Math.round((amount+misc)*0.1);
+  const grandTotal = amount + misc + expense + taxAmt;
+
+  const content = buildInvoiceDoc(
+    window._docState.num, issueDate, dueDate, regNo,
+    c.clientUpper, compName, compAddr, compBank,
+    c.engineer, workMonth, amount, 0, c.overRate, 0, c.underRate,
+    amount, expense, misc, taxAmt, grandTotal,
+    `${c.start} 〜 ${c.end}`, c
+  );
+
+  const win = window.open('', '_blank');
+  if (!win) { alert('ポップアップがブロックされています。解除してください。'); return; }
+  win.document.write(`<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8"><title>PDFプレビュー</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:#888;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:20px}
+.topbar{width:780px;max-width:96vw;display:flex;justify-content:space-between;align-items:center;padding:10px 0;margin-bottom:16px}
+.topbar-logo{font-weight:700;font-size:16px;color:#fff}
+.btn-dl{background:#00c896;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-dl:hover{background:#00a67a}
+.paper{background:#fff;width:780px;max-width:96vw;padding:24mm 18mm;box-shadow:0 4px 32px rgba(0,0,0,.3);border-radius:4px}
+@media print{body{background:#fff;padding:0}
+.topbar{display:none}
+.paper{box-shadow:none;width:100%;padding:12mm 10mm;border-radius:0}
+@page{margin:0;size:A4}}
+</style></head>
+<body>
+<div class="topbar">
+  <div class="topbar-logo">MIGI WORKS</div>
+  <button class="btn-dl" onclick="window.print()">このPDFをダウンロード</button>
+</div>
+<div class="paper">${content}</div>
+</body></html>`);
+  win.document.close();
+}
+
+function openDocFromAtt(contractId, type, year, month) {
+  const c = CONTRACTS.find(x => x.id === contractId);
+  if (c) openDoc(type, contractId);
+}
 
 // ─── UPLOAD MODAL ────────────────────────────────────
 function openUploadModal(contractId, engineerName, year, month) {

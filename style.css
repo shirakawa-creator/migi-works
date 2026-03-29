@@ -515,3 +515,39 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 
 /* ===== DOC MODAL WITH EMPLOYEE PICKER ===== */
 /* doc-modal sizing handled above */
+
+/* ===== ATT CARD V2 (SES WORKS style) ===== */
+.att-entry-card2{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);display:grid;grid-template-columns:200px 1fr 1fr 160px;gap:0;box-shadow:var(--shadow);overflow:hidden;margin-bottom:10px;transition:border-color .15s}
+.att-entry-card2:hover{border-color:var(--border2)}
+.att-entry-card2.att-card-confirmed{border-left:4px solid var(--acc)}
+.att-entry-card2.att-card-inputted{border-left:4px solid var(--blue)}
+
+.att2-left{padding:14px 14px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:5px}
+.att2-name{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.att2-job{font-size:11px;color:var(--ink2);font-weight:500;margin-bottom:4px}
+.att2-meta-row{display:flex;align-items:center;gap:6px;font-size:11px}
+.att2-lbl{color:var(--muted);min-width:56px;font-size:10px;flex-shrink:0}
+
+.att2-party{padding:14px 14px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:4px}
+.att2-party-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.att2-party-row{display:flex;gap:6px;font-size:11px;align-items:baseline}
+.att2-plbl{color:var(--muted);min-width:58px;font-size:10px;flex-shrink:0}
+.att2-pval{color:var(--ink);font-weight:500}
+.att2-amount{color:var(--navy);font-weight:700}
+
+.att2-actions{padding:14px 12px;display:flex;flex-direction:column;gap:8px;justify-content:center;align-items:stretch}
+.att2-btn-detail{padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--card);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--ink);transition:all .12s;text-align:center}
+.att2-btn-detail:hover{background:var(--bg);border-color:var(--border2)}
+.att2-pdf-wrap{display:flex;border-radius:7px;overflow:hidden;border:1px solid var(--border)}
+.att2-btn-pdf{flex:1;padding:8px 6px;background:var(--card);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--ink);border:none;transition:all .12s;text-align:center}
+.att2-btn-pdf:hover{background:var(--bg)}
+.att2-btn-pdf-arrow{width:28px;background:var(--bg);border:none;border-left:1px solid var(--border);cursor:pointer;color:var(--muted);font-size:12px;transition:all .12s}
+.att2-btn-pdf-arrow:hover{background:var(--border);color:var(--ink)}
+
+/* ===== ATT DETAIL MODAL ===== */
+.detail-section-title{font-size:11px;font-weight:700;color:var(--ink);padding-bottom:6px;border-bottom:2px solid var(--border2);margin-bottom:8px}
+.detail-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.detail-table{display:flex;flex-direction:column;gap:0}
+.detail-row{display:flex;align-items:flex-start;border-bottom:1px solid var(--border);min-height:30px}
+.detail-lbl{background:var(--bg);font-size:11px;font-weight:600;color:var(--ink2);padding:7px 10px;min-width:140px;flex-shrink:0;border-right:1px solid var(--border)}
+.detail-val{font-size:12px;color:var(--ink);padding:7px 10px;flex:1}
