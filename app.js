@@ -2181,6 +2181,16 @@ function showEmployeePicker(type, contract, amount, tax, total, note) {
       <div class="inv-sender-row"><span class="inv-sender-lbl">住所</span><input class="inv-sender-input" id="doc-from-addr" value="${escHtml(MY_COMPANY.address || '〒107-0052 東京都港区赤坂1-1-1')}" oninput="refreshDocPreview()"></div>
       <div class="inv-sender-row"><span class="inv-sender-lbl">TEL</span><input class="inv-sender-input" id="doc-from-tel" value="${escHtml(MY_COMPANY.tel || '03-1234-5678')}" oninput="refreshDocPreview()"></div>
       <div class="inv-sender-row"><span class="inv-sender-lbl">担当者</span><input class="inv-sender-input" id="doc-from-person" value="" placeholder="左から選択 or 入力" oninput="refreshDocPreview()"></div>
+      ${type === '注文書' ? `
+      <div style="margin-top:8px;padding:10px;background:#fff;border:1px solid #e0e0e0;border-radius:6px;font-size:11px">
+        <div style="font-weight:700;color:#333;margin-bottom:6px">注文請書の発行</div>
+        <div style="display:flex;gap:12px">
+          <label style="cursor:pointer;display:flex;align-items:center;gap:4px"><input type="radio" name="ukesho-opt" value="" checked onchange="document.getElementById('ukesho-hint').style.display='none'">選択なし</label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:4px"><input type="radio" name="ukesho-opt" value="yes" onchange="document.getElementById('ukesho-hint').style.display='block'">発行する</label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:4px"><input type="radio" name="ukesho-opt" value="no" onchange="document.getElementById('ukesho-hint').style.display='none'">発行しない</label>
+        </div>
+        <div id="ukesho-hint" style="display:none;margin-top:6px;font-size:10px;color:#00a67a;font-weight:600">✓ 印刷・PDF保存時に2ページ目として注文請書が追加されます</div>
+      </div>` : ''}
     </div>
     <div class="doc-preview-label" style="margin-top:6px">帳票プレビュー</div>
     <div class="doc-preview-box" id="doc-inner-preview">
@@ -2234,7 +2244,56 @@ function printDoc() {
   }
   const content = preview.innerHTML;
   const s = window._docState;
-  const title = s ? `MIGI_WORKS_${s.type}_${s.num}` : 'MIGI_WORKS_帳票';
+  const title = s ? `MIGI_WORKS_${s.type}_${s.num||''}` : 'MIGI_WORKS_帳票';
+
+  // 注文請書の発行判定
+  const ukeshoOpt = document.querySelector('input[name="ukesho-opt"]:checked')?.value || '';
+  const showUkesho = ukeshoOpt === 'yes' && s?.type === '注文書';
+
+  // 注文請書HTML生成
+  let ukeshoHtml = '';
+  if (showUkesho && s?.contract) {
+    const c = s.contract;
+    const senderName = document.getElementById('doc-from-company')?.value || MY_COMPANY.name || 'MIGI WORKS';
+    const senderAddr = document.getElementById('doc-from-addr')?.value || MY_COMPANY.address || '';
+    const personName = document.getElementById('doc-from-person')?.value || '';
+    const issueDate  = window._docIssueSettings?.issueDate
+      ? window._docIssueSettings.issueDate.replace(/-/g,'/').replace(/(\d{4})\/(\d{2})\/(\d{2})/,'$1年$2月$3日').replace(/年0/,'年').replace(/月0/,'月')
+      : new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'});
+    const period = window._docIssueSettings?.periodStart
+      ? `${window._docIssueSettings.periodStart} 〜 ${window._docIssueSettings.periodEnd}`
+      : `${c.start} 〜 ${c.end}`;
+    const months = window._docIssueSettings?.periodMonths || 1;
+    const totalAmt = c.monthly * months;
+
+    ukeshoHtml = `
+<div style="page-break-before:always;font-family:'Noto Sans JP',sans-serif;font-size:11px;color:#111;line-height:1.6;padding:4px">
+  <div style="text-align:center;font-size:22px;font-weight:700;letter-spacing:10px;margin:30px 0 30px">注　文　請　書</div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px">
+    <div>
+      <div style="font-size:11px;color:#555">${escHtml(senderAddr)}</div>
+      <div style="font-size:13px;font-weight:700;color:#111;margin-top:4px">${escHtml(senderName)}</div>
+      <div style="font-size:10px;color:#555">担当: ${escHtml(personName)||'—'}</div>
+    </div>
+    <div style="min-width:200px">
+      <div style="display:flex"><div style="background:#222;color:#fff;font-weight:700;font-size:10px;padding:5px 10px;width:60px;text-align:center">発行日</div><div style="border:1px solid #ccc;border-left:none;padding:5px 10px;font-size:10px;flex:1">${issueDate}</div></div>
+    </div>
+  </div>
+  <div style="font-size:12px;margin-bottom:20px">
+    この度は発注をいただきまして誠にありがとうございます。<br>
+    下記の通り請書を申し上げます。
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:10px">
+    <tr><td style="background:#eee;font-weight:700;padding:8px 12px;border:1px solid #ccc;width:120px">作業内容</td><td style="border:1px solid #ccc;border-left:none;padding:8px 12px">${escHtml(c.name)}</td></tr>
+    <tr><td style="background:#eee;font-weight:700;padding:8px 12px;border:1px solid #ccc;border-top:none">作業者</td><td style="border:1px solid #ccc;border-left:none;border-top:none;padding:8px 12px">${escHtml(c.engineer)} 様</td></tr>
+    <tr><td style="background:#eee;font-weight:700;padding:8px 12px;border:1px solid #ccc;border-top:none">契約期間</td><td style="border:1px solid #ccc;border-left:none;border-top:none;padding:8px 12px">${escHtml(period)}</td></tr>
+    <tr><td style="background:#eee;font-weight:700;padding:8px 12px;border:1px solid #ccc;border-top:none">契約金額</td><td style="border:1px solid #ccc;border-left:none;border-top:none;padding:8px 12px;font-weight:700;font-size:13px">¥${totalAmt.toLocaleString()}（税抜）${months>1?` / ${c.monthly.toLocaleString()}円×${months}ヶ月`:''}</td></tr>
+    <tr><td style="background:#eee;font-weight:700;padding:8px 12px;border:1px solid #ccc;border-top:none">基準時間</td><td style="border:1px solid #ccc;border-left:none;border-top:none;padding:8px 12px">${c.minHours}時間 〜 ${c.maxHours}時間</td></tr>
+    <tr><td style="background:#eee;font-weight:700;padding:8px 12px;border:1px solid #ccc;border-top:none">調整単価</td><td style="border:1px solid #ccc;border-left:none;border-top:none;padding:8px 12px">控除 ${c.underRate.toLocaleString()}円/時間　超過 ${c.overRate.toLocaleString()}円/時間</td></tr>
+  </table>
+  <div style="margin-top:40px;text-align:right;font-size:10px;color:#555">以上</div>
+</div>`;
+  }
 
   const win = window.open('', '_blank');
   if (!win) {
@@ -2267,9 +2326,10 @@ table{border-collapse:collapse}
 <div class="no-print print-actions">
   <button class="btn-pdf" onclick="window.print()">🖨 印刷 / PDFとして保存</button>
   <button class="btn-close" onclick="window.close()">閉じる</button>
-  <p style="font-size:10px;color:#888;margin-top:8px">「PDFとして保存」→ 印刷ダイアログで送信先を「PDFに保存」に変更してください</p>
+  ${showUkesho ? '<p style="font-size:10px;color:#888;margin-top:8px">※ 2ページ目に注文請書が印刷されます</p>' : ''}
 </div>
 ${content}
+${ukeshoHtml}
 </body>
 </html>`);
   win.document.close();
@@ -2425,17 +2485,10 @@ function buildOrderDoc(num, issueDate, clientName, compName, compAddr, engName, 
     : period ? `${period} : ${baseAmt.toLocaleString()}円（税抜）/月` : `${baseAmt.toLocaleString()}円（税抜）/月`;
   const settlementUnit = contract?.settlementUnit || 15;
 
-  // 注文請書 選択オプション（デフォルト：選択なし）
-  const ukesohoOptions = `
-    <div style="margin:12px 0;padding:10px 12px;background:#f9f9f9;border:1px solid #e0e0e0;border-radius:6px;font-size:10px">
-      <span style="font-weight:700;color:#333;margin-right:12px">注文請書の発行：</span>
-      <label style="margin-right:14px;cursor:pointer"><input type="radio" name="ukesho-opt" value="" checked style="margin-right:4px">選択なし</label>
-      <label style="margin-right:14px;cursor:pointer"><input type="radio" name="ukesho-opt" value="yes" style="margin-right:4px">発行する</label>
-      <label style="cursor:pointer"><input type="radio" name="ukesho-opt" value="no" style="margin-right:4px">発行しない</label>
-    </div>`;
+  // 注文請書 選択オプション → inv-sender-fields に追加するためここでは生成しない
+  // （showEmployeePicker側のフォームに追加する）
 
   return `<div style="font-family:'Noto Sans JP',sans-serif;font-size:11px;color:#111;line-height:1.6;padding:4px;background:#fff">
-${ukesohoOptions}
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
   <div style="font-size:11px;color:#555;line-height:1.8">
     ${escHtml(senderAddr).replace(/\n/g,'<br>')}<br>
