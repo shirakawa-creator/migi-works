@@ -1837,13 +1837,13 @@ function renderContractCard(c) {
 
   <div class="cc-job-name">${c.name}</div>
 
-  <div class="cc-meta-row">
-    <div class="cc-period-badge">
-      <svg viewBox="0 0 12 12" width="11" height="11" style="flex-shrink:0"><rect x="1" y="1" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="4" y1="0.5" x2="4" y2="3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="8" y1="0.5" x2="8" y2="3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="1" y1="4.5" x2="11" y2="4.5" stroke="currentColor" stroke-width="1.2"/></svg>
-      <span class="cc-period-text">${c.start} 〜 ${c.end}</span>
+  <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+    <div style="display:inline-flex;align-items:center;gap:7px;background:#0d1b35;color:#fff;padding:6px 16px;border-radius:20px;font-size:14px;font-weight:700;letter-spacing:.3px">
+      <svg viewBox="0 0 12 12" width="12" height="12"><rect x="1" y="1" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="4" y1="0.5" x2="4" y2="3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="8" y1="0.5" x2="8" y2="3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="1" y1="4.5" x2="11" y2="4.5" stroke="currentColor" stroke-width="1.3"/></svg>
+      ${c.start} 〜 ${c.end}
     </div>
-    <div class="cc-meta-item"><span class="cc-meta-lbl">継続期間</span><span>${c.extendMonths}</span></div>
-    ${c.selfNote ? `<div class="cc-meta-item"><span class="cc-meta-lbl">自分のメモ</span><span>${c.selfNote}</span></div>` : ''}
+    <div style="font-size:12px;color:var(--muted)">継続期間：${c.extendMonths}</div>
+    ${c.selfNote ? `<div style="font-size:12px;color:var(--muted)">メモ：${c.selfNote}</div>` : ''}
   </div>
 
   <div class="cc-parties">
