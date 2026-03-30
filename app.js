@@ -1529,6 +1529,12 @@ function openDocWithSettings(type, contractId) {
     document.body.appendChild(div.firstElementChild);
   }
 
+  // 契約期間から開始・終了月を初期値として設定
+  const contractStartYear  = c ? parseInt(c.start.slice(0,4)) : yyyy;
+  const contractStartMonth = c ? parseInt(c.start.slice(5,7)) : today.getMonth()+1;
+  const contractEndYear    = c ? parseInt(c.end.slice(0,4))   : yyyy;
+  const contractEndMonth   = c ? parseInt(c.end.slice(5,7))   : today.getMonth()+1;
+
   document.getElementById('doc-settings-title').textContent = `${type}の発行設定`;
   document.getElementById('doc-settings-body').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:14px">
@@ -1540,6 +1546,28 @@ function openDocWithSettings(type, contractId) {
         <label>書類番号</label>
         <input class="input" id="dss-doc-num" value="${defaultNum}" placeholder="${defaultNum}">
       </div>
+
+      ${type === '注文書' || type === '見積書' ? `
+      <div class="form-row">
+        <label>対象期間 <span style="color:var(--coral)">*</span></label>
+        <div style="background:var(--bg);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:var(--muted);min-width:40px">開始</span>
+            <input type="number" class="input" id="dss-start-year" value="${contractStartYear}" min="2020" max="2099" style="width:80px">
+            <span style="color:var(--muted)">年</span>
+            <input type="number" class="input" id="dss-start-month" value="${contractStartMonth}" min="1" max="12" style="width:60px">
+            <span style="color:var(--muted)">月</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:var(--muted);min-width:40px">終了</span>
+            <input type="number" class="input" id="dss-end-year" value="${contractEndYear}" min="2020" max="2099" style="width:80px">
+            <span style="color:var(--muted)">年</span>
+            <input type="number" class="input" id="dss-end-month" value="${contractEndMonth}" min="1" max="12" style="width:60px">
+            <span style="color:var(--muted)">月</span>
+          </div>
+          <div id="dss-period-hint" style="font-size:11px;color:var(--acc);font-weight:600"></div>
+        </div>
+      </div>` : `
       <div class="form-row">
         <label>対象月</label>
         <div style="display:flex;gap:8px">
@@ -1548,7 +1576,8 @@ function openDocWithSettings(type, contractId) {
           <input type="number" class="input" id="dss-month" value="${today.getMonth()+1}" min="1" max="12" style="width:60px">
           <span style="line-height:38px;color:var(--muted)">月分</span>
         </div>
-      </div>
+      </div>`}
+
       ${type === '見積書' ? `
       <div class="form-row">
         <label>有効期限</label>
@@ -1566,19 +1595,62 @@ function openDocWithSettings(type, contractId) {
       </button>
     </div>`;
 
+  // 期間ヒント表示（注文書・見積書）
+  if (type === '注文書' || type === '見積書') {
+    const updateHint = () => {
+      const sy = parseInt(document.getElementById('dss-start-year')?.value)||contractStartYear;
+      const sm = parseInt(document.getElementById('dss-start-month')?.value)||contractStartMonth;
+      const ey = parseInt(document.getElementById('dss-end-year')?.value)||contractEndYear;
+      const em = parseInt(document.getElementById('dss-end-month')?.value)||contractEndMonth;
+      const months = (ey - sy) * 12 + (em - sm) + 1;
+      const hint = document.getElementById('dss-period-hint');
+      if (hint) hint.textContent = months > 0 ? `→ ${months}ヶ月分の注文書` : '期間が正しくありません';
+    };
+    setTimeout(() => {
+      ['dss-start-year','dss-start-month','dss-end-year','dss-end-month'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', updateHint);
+      });
+      updateHint();
+    }, 50);
+  }
+
   openModal('doc-settings-modal');
 }
 
 function applyDocSettings(type, contractId) {
   const issueDate  = document.getElementById('dss-issue-date')?.value || '';
   const docNum     = document.getElementById('dss-doc-num')?.value || '';
-  const targetYear = parseInt(document.getElementById('dss-year')?.value) || new Date().getFullYear();
-  const targetMonth= parseInt(document.getElementById('dss-month')?.value) || new Date().getMonth()+1;
   const note       = document.getElementById('dss-note')?.value || '';
   const validUntil = document.getElementById('dss-valid-until')?.value || '';
 
-  // Store settings for use in buildDocInner
-  window._docIssueSettings = { issueDate, docNum, targetYear, targetMonth, note, validUntil };
+  let targetYear, targetMonth, periodStart, periodEnd, periodMonths;
+
+  if (type === '注文書' || type === '見積書') {
+    // 期間指定
+    const sy = parseInt(document.getElementById('dss-start-year')?.value)  || new Date().getFullYear();
+    const sm = parseInt(document.getElementById('dss-start-month')?.value) || new Date().getMonth()+1;
+    const ey = parseInt(document.getElementById('dss-end-year')?.value)    || sy;
+    const em = parseInt(document.getElementById('dss-end-month')?.value)   || sm;
+    targetYear   = sy;
+    targetMonth  = sm;
+    periodStart  = `${sy}-${String(sm).padStart(2,'0')}-01`;
+    // 終了月の末日を計算
+    const lastDay = new Date(ey, em, 0).getDate();
+    periodEnd    = `${ey}-${String(em).padStart(2,'0')}-${lastDay}`;
+    periodMonths = (ey - sy) * 12 + (em - sm) + 1;
+  } else {
+    targetYear  = parseInt(document.getElementById('dss-year')?.value)  || new Date().getFullYear();
+    targetMonth = parseInt(document.getElementById('dss-month')?.value) || new Date().getMonth()+1;
+    periodStart = null;
+    periodEnd   = null;
+    periodMonths= 1;
+  }
+
+  window._docIssueSettings = {
+    issueDate, docNum, targetYear, targetMonth,
+    periodStart, periodEnd, periodMonths,
+    note, validUntil
+  };
 
   closeModal('doc-settings-modal');
   openDoc(type, contractId);
@@ -2249,8 +2321,25 @@ function buildDocInner(type, color, num, client, item, amount, tax, total, note,
   const taxAmt   = Math.round(taxableBase * 0.1);
   const grandTotal = taxableBase + expense + taxAmt;
 
-  if (type === '注文書') return buildOrderDoc(docNum, issueDate, client, compName, compAddr, engName, amount, grandTotal, overRate, underRate, minH, maxH, period, contract);
-  if (type === '見積書') return buildQuoteDoc(docNum, issueDate, client, compName, compAddr, compBank, engName, item, amount, tax, total, contract);
+  // 注文書：期間指定がある場合はそちらを優先
+  const s2 = window._docIssueSettings || {};
+  const orderPeriod = (s2.periodStart && s2.periodEnd)
+    ? `${s2.periodStart} 〜 ${s2.periodEnd}`
+    : period;
+  const orderMonths = s2.periodMonths || 1;
+  const orderTotalAmt = amount * orderMonths;
+
+  if (type === '注文書') return buildOrderDoc(docNum, issueDate, client, compName, compAddr, engName, amount, orderTotalAmt, overRate, underRate, minH, maxH, orderPeriod, contract, orderMonths);
+  // 見積書：期間指定がある場合はそちらを優先
+  const quotePeriod  = (s2.periodStart && s2.periodEnd) ? `${s2.periodStart} 〜 ${s2.periodEnd}` : period;
+  const quoteMonths  = s2.periodMonths || 1;
+  const quoteTotalAmt = amount * quoteMonths;
+  const quoteTax     = Math.round(quoteTotalAmt * 0.1);
+  const quoteTotal   = quoteTotalAmt + quoteTax;
+  const quoteItem    = quoteMonths > 1
+    ? `${contract ? contract.name : item}（${quotePeriod}）`
+    : item;
+  if (type === '見積書') return buildQuoteDoc(docNum, issueDate, client, compName, compAddr, compBank, engName, quoteItem, quoteTotalAmt, quoteTax, quoteTotal, contract, quoteMonths, quotePeriod);
   return buildInvoiceDoc(docNum, issueDate, dueDate, regNo, client, compName, compAddr, compBank, engName, workMonth, amount, overH, overRate, underH, underRate, amount, expense, misc, taxAmt, grandTotal, period, contract);
 }
 
@@ -2323,13 +2412,17 @@ function buildInvoiceDoc(num, issueDate, dueDate, regNo, clientName, compName, c
 }
 
 // ── 発注書 ───────────────────────────────────────────
-function buildOrderDoc(num, issueDate, clientName, compName, compAddr, engName, baseAmt, grandTotal, overRate, underRate, minH, maxH, period, contract) {
+function buildOrderDoc(num, issueDate, clientName, compName, compAddr, engName, baseAmt, grandTotal, overRate, underRate, minH, maxH, period, contract, periodMonths) {
+  periodMonths = periodMonths || 1;
   const personName = document.getElementById('doc-from-person')?.value || '';
   const senderName = document.getElementById('doc-from-company')?.value || compName;
   const senderAddr = document.getElementById('doc-from-addr')?.value || compAddr;
   const payCondition = contract ? `月末締め ${contract.paymentSite||55}日サイト払い` : '月末締め 55日サイト払い';
   const workContent  = contract ? contract.name : '業務委託';
-  const contractAmt  = period ? `${period} : ${baseAmt.toLocaleString()}円（税抜）/月` : `${baseAmt.toLocaleString()}円（税抜）/月`;
+  // 複数月の場合は合計金額を表示
+  const contractAmt = periodMonths > 1
+    ? `${period} : ${baseAmt.toLocaleString()}円（税抜）/月 × ${periodMonths}ヶ月 = ${(baseAmt * periodMonths).toLocaleString()}円（税抜）`
+    : period ? `${period} : ${baseAmt.toLocaleString()}円（税抜）/月` : `${baseAmt.toLocaleString()}円（税抜）/月`;
   const settlementUnit = contract?.settlementUnit || 15;
 
   // 注文請書 選択オプション（デフォルト：選択なし）
@@ -2395,7 +2488,9 @@ ${ukesohoOptions}
 }
 
 // ── 見積書 ───────────────────────────────────────────
-function buildQuoteDoc(num, issueDate, clientName, compName, compAddr, compBank, engName, item, amount, tax, total, contract) {
+function buildQuoteDoc(num, issueDate, clientName, compName, compAddr, compBank, engName, item, amount, tax, total, contract, periodMonths, periodLabel) {
+  periodMonths = periodMonths || 1;
+  const baseAmt = periodMonths > 1 ? Math.round(amount / periodMonths) : amount;
   const personName = document.getElementById('doc-from-person')?.value || '';
   const senderName = document.getElementById('doc-from-company')?.value || compName;
   const senderAddr = document.getElementById('doc-from-addr')?.value || compAddr;
@@ -2423,6 +2518,7 @@ function buildQuoteDoc(num, issueDate, clientName, compName, compAddr, compBank,
   <thead><tr style="background:#333;color:#fff"><th style="padding:6px 10px;text-align:left;border:1px solid #555">品目</th><th style="padding:6px 10px;text-align:right;border:1px solid #555">金額（税抜）</th></tr></thead>
   <tbody>
     <tr><td style="padding:7px 10px;border:1px solid #ccc">${escHtml(item)}</td><td style="padding:7px 10px;border:1px solid #ccc;text-align:right">¥${amount.toLocaleString()}</td></tr>
+    ${periodMonths > 1 ? `<tr><td style="padding:5px 10px;border:1px solid #ccc;color:#555;font-size:10px">　¥${baseAmt.toLocaleString()}/月 × ${periodMonths}ヶ月（${periodLabel}）</td><td style="padding:5px 10px;border:1px solid #ccc"></td></tr>` : ''}
     ${contract?`<tr><td style="padding:5px 10px;border:1px solid #ccc;color:#aaa;font-size:10px">　担当: ${escHtml(contract.engineer)}</td><td style="padding:5px 10px;border:1px solid #ccc"></td></tr>`:''}
   </tbody>
 </table>
