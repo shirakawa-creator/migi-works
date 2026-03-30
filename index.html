@@ -173,12 +173,12 @@
 
 <!-- Email Send Modal -->
 <div class="modal-overlay hidden" id="email-modal" onclick="if(event.target===this)closeModal('email-modal')">
-  <div class="modal-card" style="width:520px">
+  <div class="modal-card" style="width:560px;max-height:90vh;display:flex;flex-direction:column">
     <div class="modal-header">
-      <h3>メール送付</h3>
+      <h3 id="email-modal-title">メール送付</h3>
       <button class="modal-close" onclick="closeModal('email-modal')">✕</button>
     </div>
-    <div class="modal-body" id="email-modal-body"></div>
+    <div class="modal-body" id="email-modal-body" style="overflow-y:auto;flex:1"></div>
   </div>
 </div>
 

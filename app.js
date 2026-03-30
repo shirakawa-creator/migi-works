@@ -1046,13 +1046,13 @@ ${MY_COMPANY.salesContact || ''}`;
     </div>
     <div class="form-group">
       <label>本文</label>
-      <textarea class="input" id="inv-send-body" rows="12" style="font-size:12px">${escHtml(body)}</textarea>
+      <textarea class="input" id="inv-send-body" rows="10" style="font-size:12px">${escHtml(body)}</textarea>
     </div>
-    <div class="form-group" style="background:var(--bg);border-radius:8px;padding:12px">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">📎 添付ファイル</div>
-      <div style="font-size:12px;color:var(--ink)">請求書 ${year}年${month}月分.pdf（PDFは印刷・保存してから添付してください）</div>
+    <div class="form-group" style="background:var(--bg);border-radius:8px;padding:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px">📎 添付ファイル</div>
+      <div style="font-size:12px;color:var(--ink)">請求書 ${year}年${month}月分.pdf</div>
     </div>
-    <div class="modal-footer">
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--border);margin-top:4px">
       <button class="btn-ghost" onclick="closeModal('email-modal')">キャンセル</button>
       <button class="btn-outline" onclick="openAttPdfPreview('${contractId}',${year},${month})">📄 PDFを確認</button>
       <button class="btn-primary" onclick="sendAttInvoice('${contractId}')">📧 送付する</button>
@@ -1582,6 +1582,153 @@ function applyDocSettings(type, contractId) {
   openDoc(type, contractId);
 }
 
+// ─── CSV エクスポート ────────────────────────────────
+const CSV_HEADERS = [
+  'id','name','engineer','clientUpper','clientUpperDept','clientLower','clientLowerDept',
+  'start','end','extendStatus','extendMonths',
+  'monthly','clientLowerMonthly',
+  'minHours','maxHours','overRate','underRate','settlementUnit',
+  'paymentSite','note','selfNote','hasExpense'
+];
+const CSV_LABELS = [
+  'ID','案件名','作業者名','案件元会社','案件元担当者','人材元会社','人材元担当者',
+  '契約開始日','契約終了日','延長状況','継続期間',
+  '案件元単価','人材元単価',
+  '精算下限時間','精算上限時間','超過単価','控除単価','精算単位',
+  '支払いサイト','備考','自分のメモ','立替経費あり'
+];
+
+function exportContractsCSV() {
+  const rows = [CSV_LABELS.join(',')];
+  CONTRACTS.forEach(c => {
+    const row = CSV_HEADERS.map(key => {
+      const v = c[key] !== undefined ? String(c[key]) : '';
+      // CSVエスケープ：カンマ・改行・ダブルクォートを含む場合はダブルクォートで囲む
+      return v.includes(',') || v.includes('\n') || v.includes('"')
+        ? `"${v.replace(/"/g,'""')}"` : v;
+    });
+    rows.push(row.join(','));
+  });
+  const bom = '\uFEFF'; // Excel用BOM
+  const blob = new Blob([bom + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `migi_works_contracts_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── CSV インポート ────────────────────────────────
+function importContractsCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const text = e.target.result.replace(/^\uFEFF/, ''); // BOM除去
+      const lines = parseCSVLines(text);
+      if (lines.length < 2) { alert('データが見つかりません'); return; }
+
+      const headers = lines[0];
+      const imported = [];
+      const errors   = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const vals = lines[i];
+        if (vals.length < 2 || vals.every(v => !v)) continue; // 空行スキップ
+
+        const obj = {};
+        CSV_HEADERS.forEach((key, idx) => {
+          const labelIdx = CSV_LABELS.indexOf(headers[idx] || '');
+          const colIdx   = labelIdx >= 0 ? labelIdx : idx;
+          const val      = vals[colIdx] !== undefined ? vals[colIdx] : '';
+          // 数値変換
+          if (['monthly','clientLowerMonthly','minHours','maxHours','overRate','underRate','settlementUnit','paymentSite'].includes(key)) {
+            obj[key] = Number(val) || 0;
+          } else if (key === 'hasExpense') {
+            obj[key] = val === 'true' || val === '1';
+          } else {
+            obj[key] = val;
+          }
+        });
+
+        // 必須チェック
+        if (!obj.name || !obj.engineer || !obj.start || !obj.end) {
+          errors.push(`行${i+1}: 案件名・作業者名・開始日・終了日は必須です`);
+          continue;
+        }
+        // IDがなければ自動生成
+        if (!obj.id) obj.id = 'C-' + Date.now() + '-' + i;
+        // extendStatusのデフォルト
+        if (!obj.extendStatus) obj.extendStatus = '未確認';
+
+        // 既存IDと重複チェック → 上書き or 新規追加
+        const existing = CONTRACTS.findIndex(c => c.id === obj.id);
+        if (existing >= 0) {
+          CONTRACTS[existing] = { ...CONTRACTS[existing], ...obj };
+        } else {
+          imported.push(obj);
+        }
+      }
+
+      CONTRACTS.push(...imported);
+
+      // 結果表示
+      let msg = `✓ ${imported.length}件を新規追加しました。`;
+      const updated = lines.length - 1 - imported.length - errors.length;
+      if (updated > 0) msg += `\n${updated}件を更新しました。`;
+      if (errors.length > 0) msg += `\n\n⚠ エラー ${errors.length}件:\n${errors.slice(0,5).join('\n')}`;
+      alert(msg);
+
+      // 画面を更新
+      document.getElementById('content-area').innerHTML = renderContractsView();
+    } catch(err) {
+      alert('CSVの読み込みに失敗しました。\n' + err.message);
+    }
+    input.value = ''; // 同じファイルを再度選択できるようリセット
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseCSVLines(text) {
+  // RFC4180準拠のCSVパーサー
+  const result = [];
+  const lines  = [];
+  let cur = '', inQ = false;
+  const cells = [];
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"' && text[i+1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') { inQ = false; }
+      else cur += ch;
+    } else {
+      if (ch === '"') { inQ = true; }
+      else if (ch === ',') { cells.push(cur); cur = ''; }
+      else if (ch === '\n' || (ch === '\r' && text[i+1] === '\n')) {
+        if (ch === '\r') i++;
+        cells.push(cur); cur = '';
+        result.push([...cells]); cells.length = 0;
+      } else cur += ch;
+    }
+  }
+  if (cur || cells.length) { cells.push(cur); result.push([...cells]); }
+  return result;
+}
+
+// ─── CSV インポート用テンプレートダウンロード ────────
+function downloadCSVTemplate() {
+  const sample = [
+    CSV_LABELS.join(','),
+    ['C-SAMPLE-001','財務システム開発','岡本 和真','株式会社テックコア','田中','株式会社ミギナナメウエ','','2026-04-01','2026-09-30','未確認','6ヶ月','500000','0','140','180','3125','3125','15','30','備考','','false'].join(',')
+  ];
+  const blob = new Blob(['\uFEFF' + sample.join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'migi_works_contracts_template.csv'; a.click();
+}
+
 // ─── CONTRACTS MONTHLY VIEW ──────────────────────────
 function renderContractsView() {
   const { year, month } = CONTRACT_VIEW_STATE;
@@ -1608,10 +1755,15 @@ function renderContractsView() {
   <div class="contracts-toolbar-left">
     <button class="btn-primary btn-sm" onclick="openContractModal()">＋ 新規登録</button>
     <button class="btn-outline btn-sm" onclick="alert('一括延長確認メールを送信しました ✓')">一括延長確認</button>
-    <button class="btn-outline btn-sm" onclick="alert('CSVをダウンロードしました ✓')">
+    <button class="btn-outline btn-sm" onclick="exportContractsCSV()">
       <svg viewBox="0 0 14 14" width="12" height="12" style="margin-right:2px"><path d="M7 1v8M4 6l3 4 3-4M2 11h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-      CSVダウンロード
+      CSV出力
     </button>
+    <label class="btn-outline btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="CSVファイルを選択して取り込み">
+      <svg viewBox="0 0 14 14" width="12" height="12"><path d="M7 13V5M4 8l3-4 3 4M2 3h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      CSV取込
+      <input type="file" accept=".csv" style="display:none" onchange="importContractsCSV(this)">
+    </label>
     <button class="btn-outline btn-sm" onclick="alert('検索パネルを表示')">
       <svg viewBox="0 0 14 14" width="12" height="12" style="margin-right:2px"><circle cx="5.5" cy="5.5" r="3.5" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="8.5" y1="8.5" x2="13" y2="13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
       検索
@@ -1623,7 +1775,10 @@ function renderContractsView() {
     <button class="month-nav-btn" onclick="changeContractMonth(${nextYear},${nextMonth})">›</button>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
-    <button class="btn-outline btn-sm" onclick="changeContractMonth(${year},${month})">当月表示の月を変更する</button>
+    <button class="btn-outline btn-sm" onclick="downloadCSVTemplate()" title="CSVのフォーマットテンプレートをダウンロード">
+      <svg viewBox="0 0 14 14" width="12" height="12"><rect x="1" y="1" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="4" y1="5" x2="10" y2="5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><line x1="4" y1="8" x2="7" y2="8" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+      CSVテンプレート
+    </button>
   </div>
 </div>
 
