@@ -888,20 +888,22 @@ function renderAttCard(c, year, month) {
   <!-- 右：アクションボタン -->
   <div class="att2-actions">
     <button class="att2-btn-detail" onclick="openAttDetail('${c.id}',${year},${month})">詳細表示</button>
-    <div class="att2-pdf-wrap">
-      <button class="att2-btn-pdf" onclick="openAttPdfPreview('${c.id}',${year},${month})">PDFプレビュー</button>
-      <button class="att2-btn-pdf-arrow" onclick="toggleAttMenu('${c.id}')">▾</button>
-    </div>
-    <div class="att2-dropdown hidden" id="att-menu-${c.id}">
-      <button class="att2-dropdown-item" onclick="openAttPdfPreview('${c.id}',${year},${month});toggleAttMenu('${c.id}')">
-        🖨 PDFプレビュー・ダウンロード
-      </button>
-      <button class="att2-dropdown-item" onclick="openAttInvoiceSend('${c.id}',${year},${month});toggleAttMenu('${c.id}')">
-        📧 請求書をメールで送付
-      </button>
-      <button class="att2-dropdown-item" onclick="openDoc('請求書','${c.id}');toggleAttMenu('${c.id}')">
-        📄 請求書を発行（担当者選択）
-      </button>
+    <div style="position:relative">
+      <div class="att2-pdf-wrap">
+        <button class="att2-btn-pdf" onclick="openAttPdfPreview('${c.id}',${year},${month})">PDFプレビュー</button>
+        <button class="att2-btn-pdf-arrow" onclick="toggleAttMenu('${c.id}',event)">▾</button>
+      </div>
+      <div class="att2-dropdown hidden" id="att-menu-${c.id}">
+        <button class="att2-dropdown-item" onclick="openAttPdfPreview('${c.id}',${year},${month});toggleAttMenu('${c.id}')">
+          🖨 PDFプレビュー・ダウンロード
+        </button>
+        <button class="att2-dropdown-item" onclick="openAttInvoiceSend('${c.id}',${year},${month});toggleAttMenu('${c.id}')">
+          📧 請求書をメールで送付
+        </button>
+        <button class="att2-dropdown-item" onclick="openDoc('請求書','${c.id}');toggleAttMenu('${c.id}')">
+          📄 請求書を発行（担当者選択）
+        </button>
+      </div>
     </div>
   </div>
 </div>`;
@@ -970,8 +972,8 @@ function changeAttMonth(year, month) {
 
 function attFilter() { /* フィルター機能プレースホルダー */ }
 
-function toggleAttMenu(contractId) {
-  // Close all other menus
+function toggleAttMenu(contractId, event) {
+  if (event) event.stopPropagation();
   document.querySelectorAll('.att2-dropdown').forEach(el => {
     if (el.id !== 'att-menu-'+contractId) el.classList.add('hidden');
   });
