@@ -1109,19 +1109,30 @@ function openAttPdfPreview(contractId, year, month) {
   const nextM = month===12?1:month+1, nextY = month===12?year+1:year;
   const dueDate = `${nextY}年${String(nextM).padStart(2,'0')}月1日`;
   const workMonth = `${c.name}（${year}年${month}月分:${c.start.slice(5,7)}/01〜${c.end.slice(5,7)}/${new Date(year,month,0).getDate()}）`;
-  const hoursH = d.hours || c.minHours;
-  const hoursM = d.minutes || 0;
+  // 最新の入力値をDOMから直接読み取る（入力後にoninputが走っていない場合に備えて）
+  const hEl = document.getElementById('h-' + contractId);
+  const mEl = document.getElementById('m-' + contractId);
+  const exEl = document.getElementById('ex-' + contractId);
+  const miscEl = document.getElementById('misc-' + contractId);
+  if (hEl)    d.hours   = hEl.value;
+  if (mEl)    d.minutes = mEl.value;
+  if (exEl)   d.expense = exEl.value;
+  if (miscEl) d.misc    = miscEl.value;
+
+  const hoursH = Number(d.hours) || c.minHours;
+  const hoursM = Number(d.minutes) || 0;
   const expense = Number(d.expense)||0;
   const misc = Number(d.misc)||0;
   const taxAmt = Math.round((amount+misc)*0.1);
   const grandTotal = amount + misc + expense + taxAmt;
+  const workHoursStr = `${hoursH} 時間 ${String(hoursM).padStart(2,'0')} 分`;
 
   const content = buildInvoiceDoc(
     window._docState.num, issueDate, dueDate, regNo,
     c.clientUpper, compName, compAddr, compBank,
     c.engineer, workMonth, amount, 0, c.overRate, 0, c.underRate,
     amount, expense, misc, taxAmt, grandTotal,
-    `${c.start} 〜 ${c.end}`, c
+    `${c.start} 〜 ${c.end}`, c, workHoursStr
   );
 
   const win = window.open('', '_blank');
@@ -1742,16 +1753,27 @@ function showEmployeePicker(type, contract, amount, tax, total, note) {
   const color = typeColors[type] || '#0d1b35';
   const contractId = contract ? contract.id : '';
 
-  const empOptions = ENGINEERS.map(e =>
-    `<button class="emp-pick-btn" onclick="selectEmployee('${e.name}','${e.role}',this)"
-       data-name="${e.name}" data-role="${e.role}">
-      <div class="emp-pick-av" style="background:${e.color}">${e.initials}</div>
-      <div class="emp-pick-info">
-        <div class="emp-pick-name">${e.name}</div>
-        <div class="emp-pick-role">${e.role}</div>
-      </div>
-    </button>`
-  ).join('');
+  // 営業担当者リスト（自社情報設定から）
+  const salesPersons = MY_COMPANY.salesPersons || [];
+  const empOptions = salesPersons.length > 0
+    ? salesPersons.map((name, i) => {
+        const initials = name.replace(/\s/g,'').slice(-2) || name.slice(0,2);
+        const colors = ['#3b7dd8','#00c896','#f5a623','#e85d4a','#6c63ff','#00a67a','#e91e8c','#ff6b35'];
+        const bg = colors[i % colors.length];
+        return `<button class="emp-pick-btn" onclick="selectEmployee('${escHtml(name)}','',this)"
+           data-name="${escHtml(name)}">
+          <div class="emp-pick-av" style="background:${bg}">${initials}</div>
+          <div class="emp-pick-info">
+            <div class="emp-pick-name">${escHtml(name)}</div>
+            <div class="emp-pick-role">営業担当</div>
+          </div>
+        </button>`;
+      }).join('')
+    : `<div style="font-size:11px;color:#aaa;padding:8px;line-height:1.7">
+        担当者が未登録です。<br>
+        <a href="#" onclick="showView('company-settings',document.querySelector('[data-view=company-settings]'));closeModal('doc-modal');return false"
+           style="color:#00c896">自社情報設定で登録 →</a>
+       </div>`;
 
   const defaultClient = contract
     ? (type === '注文書' ? contract.clientLower : contract.clientUpper)
@@ -1948,7 +1970,7 @@ function buildDocInner(type, color, num, client, item, amount, tax, total, note,
 }
 
 // ── 御請求書 ─────────────────────────────────────────
-function buildInvoiceDoc(num, issueDate, dueDate, regNo, clientName, compName, compAddr, compBank, engName, workMonth, baseAmt, overH, overRate, underH, underRate, subtotal, expense, misc, taxAmt, grandTotal, period, contract) {
+function buildInvoiceDoc(num, issueDate, dueDate, regNo, clientName, compName, compAddr, compBank, engName, workMonth, baseAmt, overH, overRate, underH, underRate, subtotal, expense, misc, taxAmt, grandTotal, period, contract, workHoursStr) {
   const personName = document.getElementById('doc-from-person')?.value || '';
   const senderName = document.getElementById('doc-from-company')?.value || compName;
   const senderAddr = document.getElementById('doc-from-addr')?.value || compAddr;
@@ -1993,7 +2015,7 @@ function buildInvoiceDoc(num, issueDate, dueDate, regNo, clientName, compName, c
 <table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:10px">
   <thead><tr style="background:#333;color:#fff"><th style="padding:6px 10px;text-align:left;border:1px solid #555">項目</th><th style="padding:6px 10px;border:1px solid #555">稼働時間</th><th style="padding:6px 10px;text-align:right;border:1px solid #555">金額（税抜）</th><th style="padding:6px 10px;text-align:left;border:1px solid #555">備考</th></tr></thead>
   <tbody>
-    <tr><td style="padding:6px 10px;border:1px solid #ccc">作業時間</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:center">${minH} 時間 00 分</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:right">${baseAmt.toLocaleString()}円</td><td style="padding:6px 10px;border:1px solid #ccc;color:#555">${minH} 時間 〜 ${maxH} 時間</td></tr>
+    <tr><td style="padding:6px 10px;border:1px solid #ccc">作業時間</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:center">${workHoursStr || minH+' 時間 00 分'}</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:right">${baseAmt.toLocaleString()}円</td><td style="padding:6px 10px;border:1px solid #ccc;color:#555">${minH} 時間 〜 ${maxH} 時間</td></tr>
     <tr><td style="padding:6px 10px;border:1px solid #ccc">超過分</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:center">${overH}</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:right">${overH>0?(overH*overRate).toLocaleString():0}円</td><td style="padding:6px 10px;border:1px solid #ccc;color:#555">${overRate.toLocaleString()}円/時間（${contract?.settlementUnit||15}分単位）</td></tr>
     <tr><td style="padding:6px 10px;border:1px solid #ccc">控除分</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:center">${underH}</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:right">${underH>0?'▲'+(underH*underRate).toLocaleString():'▲0'}円</td><td style="padding:6px 10px;border:1px solid #ccc;color:#555">${underRate.toLocaleString()}円/時間（${contract?.settlementUnit||15}分単位）</td></tr>
     <tr><td colspan="4" style="padding:4px;border:1px solid #ccc;background:#fafafa;height:20px"></td></tr>
