@@ -890,7 +890,18 @@ function renderAttCard(c, year, month) {
     <button class="att2-btn-detail" onclick="openAttDetail('${c.id}',${year},${month})">詳細表示</button>
     <div class="att2-pdf-wrap">
       <button class="att2-btn-pdf" onclick="openAttPdfPreview('${c.id}',${year},${month})">PDFプレビュー</button>
-      <button class="att2-btn-pdf-arrow" onclick="openDocFromAtt('${c.id}','請求書',${year},${month})">▾</button>
+      <button class="att2-btn-pdf-arrow" onclick="toggleAttMenu('${c.id}')">▾</button>
+    </div>
+    <div class="att2-dropdown hidden" id="att-menu-${c.id}">
+      <button class="att2-dropdown-item" onclick="openAttPdfPreview('${c.id}',${year},${month});toggleAttMenu('${c.id}')">
+        🖨 PDFプレビュー・ダウンロード
+      </button>
+      <button class="att2-dropdown-item" onclick="openAttInvoiceSend('${c.id}',${year},${month});toggleAttMenu('${c.id}')">
+        📧 請求書をメールで送付
+      </button>
+      <button class="att2-dropdown-item" onclick="openDoc('請求書','${c.id}');toggleAttMenu('${c.id}')">
+        📄 請求書を発行（担当者選択）
+      </button>
     </div>
   </div>
 </div>`;
@@ -958,6 +969,120 @@ function changeAttMonth(year, month) {
 }
 
 function attFilter() { /* フィルター機能プレースホルダー */ }
+
+function toggleAttMenu(contractId) {
+  // Close all other menus
+  document.querySelectorAll('.att2-dropdown').forEach(el => {
+    if (el.id !== 'att-menu-'+contractId) el.classList.add('hidden');
+  });
+  document.getElementById('att-menu-'+contractId)?.classList.toggle('hidden');
+}
+// Close menu when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.att2-pdf-wrap') && !e.target.closest('.att2-dropdown')) {
+    document.querySelectorAll('.att2-dropdown').forEach(el => el.classList.add('hidden'));
+  }
+});
+
+function openAttInvoiceSend(contractId, year, month) {
+  const c = CONTRACTS.find(x => x.id === contractId);
+  if (!c) return;
+  const d = getAttData(contractId, year, month);
+
+  // Read latest input values from DOM
+  const hEl = document.getElementById('h-'+contractId);
+  const mEl = document.getElementById('m-'+contractId);
+  if (hEl) d.hours   = hEl.value;
+  if (mEl) d.minutes = mEl.value;
+
+  const hoursStr = d.hours ? `${d.hours}時間${d.minutes||0}分` : '未入力';
+  const amount   = c.monthly;
+  const tax      = Math.round(amount * 0.1);
+  const total    = amount + tax;
+  const nextM    = month===12?1:month+1;
+  const nextY    = month===12?year+1:year;
+  const dueDate  = `${nextY}年${String(nextM).padStart(2,'0')}月1日`;
+
+  // Get client email from clients list
+  const clientData = CLIENTS.find(cl => cl.name === c.clientUpper);
+  const toEmail    = clientData?.invoiceEmail || clientData?.salesEmail || '';
+
+  // Fill email modal
+  const tpl = EMAIL_TEMPLATES.find(t => t.id === 'invoice-send') || EMAIL_TEMPLATES[2];
+  const subject = `【ご請求書送付】${c.name} ${year}年${month}月分`;
+  const body =
+`${c.clientUpper} ご担当者様
+
+お世話になっております。
+${MY_COMPANY.name || 'MIGI WORKS'} でございます。
+
+${year}年${month}月分のご請求書をお送りいたします。
+
+━━━━━━━━━━━━━━━━━━━━
+■ 作業内容：${c.name}
+■ 技術者名：${c.engineer}
+■ 稼働時間：${hoursStr}
+■ ご請求金額：¥${total.toLocaleString()}（税込）
+■ お支払期限：${dueDate}
+━━━━━━━━━━━━━━━━━━━━
+
+ご確認のほど、よろしくお願いいたします。
+
+${MY_COMPANY.name || 'MIGI WORKS'}
+${MY_COMPANY.salesContact || ''}`;
+
+  document.getElementById('email-modal-body').innerHTML = `
+    <div class="form-group">
+      <label>送付先メールアドレス</label>
+      <input class="input" id="inv-send-to" value="${escHtml(toEmail)}" placeholder="送付先のメールアドレス">
+    </div>
+    <div class="form-group">
+      <label>CC</label>
+      <input class="input" id="inv-send-cc" value="${escHtml(MY_COMPANY.ccMailList||'')}" placeholder="CC（任意）">
+    </div>
+    <div class="form-group">
+      <label>件名</label>
+      <input class="input" id="inv-send-subject" value="${escHtml(subject)}">
+    </div>
+    <div class="form-group">
+      <label>本文</label>
+      <textarea class="input" id="inv-send-body" rows="12" style="font-size:12px">${escHtml(body)}</textarea>
+    </div>
+    <div class="form-group" style="background:var(--bg);border-radius:8px;padding:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">📎 添付ファイル</div>
+      <div style="font-size:12px;color:var(--ink)">請求書 ${year}年${month}月分.pdf（PDFは印刷・保存してから添付してください）</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('email-modal')">キャンセル</button>
+      <button class="btn-outline" onclick="openAttPdfPreview('${contractId}',${year},${month})">📄 PDFを確認</button>
+      <button class="btn-primary" onclick="sendAttInvoice('${contractId}')">📧 送付する</button>
+    </div>`;
+
+  document.querySelector('#email-modal .modal-header h3').textContent = '請求書メール送付';
+  openModal('email-modal');
+}
+
+function sendAttInvoice(contractId) {
+  const to      = document.getElementById('inv-send-to')?.value || '';
+  const subject = document.getElementById('inv-send-subject')?.value || '';
+  if (!to) { alert('送付先メールアドレスを入力してください'); return; }
+
+  // Mark as sent in att data
+  const { year, month } = ATTENDANCE_VIEW_STATE;
+  const d = getAttData(contractId, year, month);
+  d.invoiceSent = true;
+  d.invoiceSentAt = new Date().toLocaleString('ja-JP');
+
+  closeModal('email-modal');
+  refreshAttCard(contractId);
+
+  // Toast
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:14px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);animation:modalIn .2s ease';
+  toast.textContent = `✓ ${to} に請求書メールを送付しました`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
 
 // ─── ATT DETAIL MODAL ────────────────────────────────
 function openAttDetail(contractId, year, month) {
