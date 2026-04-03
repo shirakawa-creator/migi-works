@@ -89,7 +89,13 @@ let MY_COMPANY = {
   capital: '',
   foundedDate: '',
   pmark: false,
+  pmarkNo: '',
   isms: false,
+  ismsNo: '',
+  dispatchLicense: false,
+  dispatchLicenseNo: '',
+  dispatchSpecificLicense: false,
+  dispatchSpecificLicenseNo: '',
   accountManager: '',
   bankAccount1: '',
   bankAccount2: '',
@@ -2795,20 +2801,59 @@ function renderCompanySettings() {
 <div class="cs-section">
   <div class="cs-section-title">
     <svg viewBox="0 0 14 14" width="13" height="13"><path d="M7 1l1.5 3 3.5.5-2.5 2.5.5 3.5L7 9l-3 1.5.5-3.5L2 4.5l3.5-.5z" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
-    認証・担当者
+    認証・資格・担当者
   </div>
   <div class="cs-section-body">
-    <div class="cs-grid" style="margin-bottom:14px">
-      <div class="cs-field">
-        <div class="cs-label" style="margin-bottom:8px">Pマーク</div>
-        <label class="toggle-switch"><input type="checkbox" id="cs-pmark" ${chk(c.pmark)}><span class="toggle-slider"></span></label>
+
+    <!-- Pマーク -->
+    <div class="cs-cert-row">
+      <div class="cs-cert-left">
+        <div class="cs-label" style="margin-bottom:6px">Pマーク</div>
+        <label class="toggle-switch"><input type="checkbox" id="cs-pmark" ${chk(c.pmark)} onchange="toggleCertNo('cs-pmark-no',this.checked)"><span class="toggle-slider"></span></label>
       </div>
-      <div class="cs-field">
-        <div class="cs-label" style="margin-bottom:8px">ISMS認証</div>
-        <label class="toggle-switch"><input type="checkbox" id="cs-isms" ${chk(c.isms)}><span class="toggle-slider"></span></label>
+      <div class="cs-cert-right" id="cs-pmark-no" style="${c.pmark?'':'display:none'}">
+        <div class="cs-label">認証番号</div>
+        <input class="input" id="cs-pmark-num" value="${escHtml(c.pmarkNo||'')}" placeholder="例: 10001234(01)">
       </div>
     </div>
-    <div class="cs-field">
+
+    <!-- ISMS -->
+    <div class="cs-cert-row">
+      <div class="cs-cert-left">
+        <div class="cs-label" style="margin-bottom:6px">ISMS認証</div>
+        <label class="toggle-switch"><input type="checkbox" id="cs-isms" ${chk(c.isms)} onchange="toggleCertNo('cs-isms-no',this.checked)"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="cs-cert-right" id="cs-isms-no" style="${c.isms?'':'display:none'}">
+        <div class="cs-label">認証番号</div>
+        <input class="input" id="cs-isms-num" value="${escHtml(c.ismsNo||'')}" placeholder="例: IS 12345">
+      </div>
+    </div>
+
+    <!-- 労働者派遣事業許可 -->
+    <div class="cs-cert-row">
+      <div class="cs-cert-left">
+        <div class="cs-label" style="margin-bottom:6px">労働者派遣事業許可</div>
+        <label class="toggle-switch"><input type="checkbox" id="cs-dispatch" ${chk(c.dispatchLicense)} onchange="toggleCertNo('cs-dispatch-no',this.checked)"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="cs-cert-right" id="cs-dispatch-no" style="${c.dispatchLicense?'':'display:none'}">
+        <div class="cs-label">許可番号</div>
+        <input class="input" id="cs-dispatch-num" value="${escHtml(c.dispatchLicenseNo||'')}" placeholder="例: 派13-012345">
+      </div>
+    </div>
+
+    <!-- 特定労働者派遣事業 -->
+    <div class="cs-cert-row">
+      <div class="cs-cert-left">
+        <div class="cs-label" style="margin-bottom:6px">有料職業紹介事業許可</div>
+        <label class="toggle-switch"><input type="checkbox" id="cs-dispatch-sp" ${chk(c.dispatchSpecificLicense)} onchange="toggleCertNo('cs-dispatch-sp-no',this.checked)"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="cs-cert-right" id="cs-dispatch-sp-no" style="${c.dispatchSpecificLicense?'':'display:none'}">
+        <div class="cs-label">許可番号</div>
+        <input class="input" id="cs-dispatch-sp-num" value="${escHtml(c.dispatchSpecificLicenseNo||'')}" placeholder="例: 13-ユ-012345">
+      </div>
+    </div>
+
+    <div class="cs-field" style="margin-top:14px">
       <div class="cs-label">会計担当者名</div>
       <input class="input" id="cs-account-mgr" value="${escHtml(c.accountManager)}" placeholder="担当者の氏名">
     </div>
@@ -2992,6 +3037,11 @@ function renderCompanySettings() {
 </div>`;
 }
 
+function toggleCertNo(divId, show) {
+  const el = document.getElementById(divId);
+  if (el) el.style.display = show ? '' : 'none';
+}
+
 function saveCompanySettings() {
   MY_COMPANY = {
     ...MY_COMPANY,
@@ -3004,7 +3054,13 @@ function saveCompanySettings() {
     capital:            document.getElementById('cs-capital')?.value || '',
     foundedDate:        document.getElementById('cs-founded')?.value || '',
     pmark:              document.getElementById('cs-pmark')?.checked || false,
+    pmarkNo:            document.getElementById('cs-pmark-num')?.value || '',
     isms:               document.getElementById('cs-isms')?.checked || false,
+    ismsNo:             document.getElementById('cs-isms-num')?.value || '',
+    dispatchLicense:    document.getElementById('cs-dispatch')?.checked || false,
+    dispatchLicenseNo:  document.getElementById('cs-dispatch-num')?.value || '',
+    dispatchSpecificLicense:   document.getElementById('cs-dispatch-sp')?.checked || false,
+    dispatchSpecificLicenseNo: document.getElementById('cs-dispatch-sp-num')?.value || '',
     accountManager:     document.getElementById('cs-account-mgr')?.value || '',
     bankAccount1:       document.getElementById('cs-bank1')?.value || '',
     bankAccount2:       document.getElementById('cs-bank2')?.value || '',
