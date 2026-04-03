@@ -1256,16 +1256,50 @@ function openAttPdfPreview(contractId, year, month) {
   const hoursM = Number(d.minutes) || 0;
   const expense = Number(d.expense)||0;
   const misc = Number(d.misc)||0;
-  const taxAmt = Math.round((amount+misc)*0.1);
-  const grandTotal = amount + misc + expense + taxAmt;
+
+  // 実稼働時間（分換算）
+  const actualMinutes = hoursH * 60 + hoursM;
+  const minMinutes    = c.minHours * 60;
+  const maxMinutes    = c.maxHours * 60;
+
+  // 精算単位（分）
+  const unit = Number(c.settlementUnit) || 60;
+
+  // 超過・控除の時間計算（精算単位切り捨て）
+  let overMinutes  = 0;
+  let underMinutes = 0;
+  if (actualMinutes > maxMinutes) {
+    overMinutes = Math.floor((actualMinutes - maxMinutes) / unit) * unit;
+  } else if (actualMinutes < minMinutes) {
+    underMinutes = Math.floor((minMinutes - actualMinutes) / unit) * unit;
+  }
+
+  const overH_calc  = Math.floor(overMinutes  / 60);
+  const overM_calc  = overMinutes  % 60;
+  const underH_calc = Math.floor(underMinutes / 60);
+  const underM_calc = underMinutes % 60;
+
+  // 超過・控除金額（精算単位あたりの単価 × 単位数）
+  const overAmt  = Math.floor(overMinutes  / unit) * (c.overRate  * unit / 60);
+  const underAmt = Math.floor(underMinutes / unit) * (c.underRate * unit / 60);
+
+  // 請求額 = 基本単価 + 超過 - 控除 + 雑費
+  const baseAmount   = c.monthly;
+  const adjustedBase = baseAmount + overAmt - underAmt;
+  const taxAmt       = Math.round((adjustedBase + misc) * 0.1);
+  const grandTotal   = adjustedBase + misc + expense + taxAmt;
+
   const workHoursStr = `${hoursH} 時間 ${String(hoursM).padStart(2,'0')} 分`;
 
   const content = buildInvoiceDoc(
     window._docState.num, issueDate, dueDate, regNo,
     c.clientUpper, compName, compAddr, compBank,
-    c.engineer, workMonth, amount, 0, c.overRate, 0, c.underRate,
-    amount, expense, misc, taxAmt, grandTotal,
-    `${c.start} 〜 ${c.end}`, c, workHoursStr
+    c.engineer, workMonth, baseAmount,
+    overMinutes > 0 ? overH_calc + overM_calc/60 : 0, c.overRate,
+    underMinutes > 0 ? underH_calc + underM_calc/60 : 0, c.underRate,
+    adjustedBase, expense, misc, taxAmt, grandTotal,
+    `${c.start} 〜 ${c.end}`, c, workHoursStr,
+    overH_calc, overM_calc, underH_calc, underM_calc, overAmt, underAmt
   );
 
   const win = window.open('', '_blank');
@@ -2410,7 +2444,7 @@ function buildDocInner(type, color, num, client, item, amount, tax, total, note,
 }
 
 // ── 御請求書 ─────────────────────────────────────────
-function buildInvoiceDoc(num, issueDate, dueDate, regNo, clientName, compName, compAddr, compBank, engName, workMonth, baseAmt, overH, overRate, underH, underRate, subtotal, expense, misc, taxAmt, grandTotal, period, contract, workHoursStr) {
+function buildInvoiceDoc(num, issueDate, dueDate, regNo, clientName, compName, compAddr, compBank, engName, workMonth, baseAmt, overH, overRate, underH, underRate, subtotal, expense, misc, taxAmt, grandTotal, period, contract, workHoursStr, overHour, overMin, underHour, underMin, overAmt, underAmt) {
   const personName = document.getElementById('doc-from-person')?.value || '';
   const senderName = document.getElementById('doc-from-company')?.value || compName;
   const senderAddr = document.getElementById('doc-from-addr')?.value || compAddr;
@@ -2456,8 +2490,8 @@ function buildInvoiceDoc(num, issueDate, dueDate, regNo, clientName, compName, c
   <thead><tr style="background:#333;color:#fff"><th style="padding:6px 10px;text-align:left;border:1px solid #555">項目</th><th style="padding:6px 10px;border:1px solid #555">稼働時間</th><th style="padding:6px 10px;text-align:right;border:1px solid #555">金額（税抜）</th><th style="padding:6px 10px;text-align:left;border:1px solid #555">備考</th></tr></thead>
   <tbody>
     <tr><td style="padding:6px 10px;border:1px solid #ccc">作業時間</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:center">${workHoursStr || minH+' 時間 00 分'}</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:right">${baseAmt.toLocaleString()}円</td><td style="padding:6px 10px;border:1px solid #ccc;color:#555">${minH} 時間 〜 ${maxH} 時間</td></tr>
-    <tr><td style="padding:6px 10px;border:1px solid #ccc">超過分</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:center">${overH}</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:right">${overH>0?(overH*overRate).toLocaleString():0}円</td><td style="padding:6px 10px;border:1px solid #ccc;color:#555">${overRate.toLocaleString()}円/時間（${contract?.settlementUnit||15}分単位）</td></tr>
-    <tr><td style="padding:6px 10px;border:1px solid #ccc">控除分</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:center">${underH}</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:right">${underH>0?'▲'+(underH*underRate).toLocaleString():'▲0'}円</td><td style="padding:6px 10px;border:1px solid #ccc;color:#555">${underRate.toLocaleString()}円/時間（${contract?.settlementUnit||15}分単位）</td></tr>
+    <tr><td style="padding:6px 10px;border:1px solid #ccc">超過分</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:center">${overHour!=null ? (overHour > 0 || overMin > 0 ? `${overHour}時間${overMin}分` : '0') : (overH>0?overH:'0')}</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:right;${overAmt>0?'color:#e85d4a;font-weight:600':''}">${overAmt!=null ? (overAmt>0 ? '+'+Math.round(overAmt).toLocaleString()+'円' : '0円') : (overH>0?(overH*overRate).toLocaleString()+'円':'0円')}</td><td style="padding:6px 10px;border:1px solid #ccc;color:#555">${overRate.toLocaleString()}円/時間（${contract?.settlementUnit||15}分単位）</td></tr>
+    <tr><td style="padding:6px 10px;border:1px solid #ccc">控除分</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:center">${underHour!=null ? (underHour > 0 || underMin > 0 ? `${underHour}時間${underMin}分` : '0') : (underH>0?underH:'0')}</td><td style="padding:6px 10px;border:1px solid #ccc;text-align:right;${underAmt>0?'color:#3b7dd8;font-weight:600':''}">${underAmt!=null ? (underAmt>0 ? '▲'+Math.round(underAmt).toLocaleString()+'円' : '▲0円') : (underH>0?'▲'+(underH*underRate).toLocaleString()+'円':'▲0円')}</td><td style="padding:6px 10px;border:1px solid #ccc;color:#555">${underRate.toLocaleString()}円/時間（${contract?.settlementUnit||15}分単位）</td></tr>
     <tr><td colspan="4" style="padding:4px;border:1px solid #ccc;background:#fafafa;height:20px"></td></tr>
   </tbody>
 </table>
