@@ -3075,12 +3075,16 @@ function renderClientsView() {
   <div class="card-header">
     <div class="card-title">取引先一覧</div>
     <div class="card-actions">
+      <button class="btn-outline btn-sm" onclick="exportClientsCSV()">
+        <svg viewBox="0 0 14 14" width="12" height="12" style="margin-right:2px"><path d="M7 1v8M4 6l3 4 3-4M2 11h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        CSV出力
+      </button>
       <button class="btn-primary btn-sm" onclick="openClientModal(null)">＋ 取引先登録</button>
     </div>
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>ID</th><th>会社名</th><th>電話番号</th><th>郵便番号</th><th>住所</th><th>営業担当者</th><th>請求書送付先</th><th></th></tr></thead>
+      <thead><tr><th>ID</th><th>会社名</th><th>契約区分</th><th>電話番号</th><th>郵便番号</th><th>住所</th><th>営業担当者</th><th>請求書送付先</th><th></th></tr></thead>
       <tbody id="clients-tbody">
         ${CLIENTS.map((cl,i) => renderClientRow(cl,i)).join('')}
       </tbody>
@@ -3089,13 +3093,24 @@ function renderClientsView() {
 </div>`;
 }
 
+function getClientContractRoles(clientName) {
+  const asUpper = CONTRACTS.some(c => c.clientUpper === clientName);
+  const asLower = CONTRACTS.some(c => c.clientLower === clientName);
+  if (asUpper && asLower) return '<span class="client-role-badge both">案件元・人材元</span>';
+  if (asUpper) return '<span class="client-role-badge upper">案件元</span>';
+  if (asLower) return '<span class="client-role-badge lower">人材元</span>';
+  return '<span class="client-role-badge none">—</span>';
+}
+
 function renderClientRow(cl, i) {
+  const roles = getClientContractRoles(cl.name);
   return `<tr>
     <td style="font-weight:700;color:var(--blue);font-size:11px">${cl.id}</td>
     <td><strong>${cl.name}</strong></td>
+    <td>${roles}</td>
     <td>${cl.tel}</td>
     <td>${cl.zip}</td>
-    <td style="font-size:11px;max-width:200px">${cl.address}</td>
+    <td style="font-size:11px;max-width:180px">${cl.address}</td>
     <td>${cl.salesPerson}<br><span class="text-muted">${cl.salesEmail}</span></td>
     <td style="font-size:11px">${cl.invoiceEmail}</td>
     <td class="td-actions">
@@ -3103,6 +3118,28 @@ function renderClientRow(cl, i) {
       <button class="btn-ghost btn-sm" style="color:var(--coral)" onclick="deleteClient(${i})">削除</button>
     </td>
   </tr>`;
+}
+
+function exportClientsCSV() {
+  const headers = ['ID','会社名','契約区分','電話番号','郵便番号','住所','営業担当者名','営業担当者メール','請求書送付先メール'];
+  const rows = [headers.join(',')];
+  CLIENTS.forEach(cl => {
+    const role = CONTRACTS.some(c=>c.clientUpper===cl.name) && CONTRACTS.some(c=>c.clientLower===cl.name)
+      ? '案件元・人材元'
+      : CONTRACTS.some(c=>c.clientUpper===cl.name) ? '案件元'
+      : CONTRACTS.some(c=>c.clientLower===cl.name) ? '人材元' : '—';
+    const vals = [cl.id, cl.name, role, cl.tel, cl.zip, cl.address, cl.salesPerson, cl.salesEmail, cl.invoiceEmail];
+    rows.push(vals.map(v => {
+      const s = String(v||'');
+      return s.includes(',') || s.includes('\n') || s.includes('"') ? `"${s.replace(/"/g,'""')}"` : s;
+    }).join(','));
+  });
+  const blob = new Blob(['\uFEFF' + rows.join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `migi_works_clients_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function openClientModal(idx) {
