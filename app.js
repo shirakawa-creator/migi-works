@@ -2807,10 +2807,17 @@ function renderCompanySettings() {
 
     <!-- Pマーク -->
     <div class="cs-cert-row">
-      <div class="cs-cert-left">
-        <div class="cs-label" style="margin-bottom:6px">Pマーク</div>
-        <label class="toggle-switch"><input type="checkbox" id="cs-pmark" ${chk(c.pmark)} onchange="toggleCertNo('cs-pmark-no',this.checked)"><span class="toggle-slider"></span></label>
-      </div>
+      <label class="cs-cert-check-card ${c.pmark?'checked':''}">
+        <input type="checkbox" id="cs-pmark" ${chk(c.pmark)} onchange="toggleCertNo('cs-pmark-no',this.checked);this.closest('.cs-cert-check-card').classList.toggle('checked',this.checked)">
+        <div class="cs-cert-check-icon">
+          <svg viewBox="0 0 20 20" width="18" height="18"><path d="M10 2l2 5h5l-4 3 1.5 5L10 12l-4.5 3L7 10 3 7h5z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+        </div>
+        <div class="cs-cert-check-text">
+          <div class="cs-cert-check-name">Pマーク</div>
+          <div class="cs-cert-check-desc">プライバシーマーク認証</div>
+        </div>
+        <div class="cs-cert-check-badge">${c.pmark ? '取得済' : '未取得'}</div>
+      </label>
       <div class="cs-cert-right" id="cs-pmark-no" style="${c.pmark?'':'display:none'}">
         <div class="cs-label">認証番号</div>
         <input class="input" id="cs-pmark-num" value="${escHtml(c.pmarkNo||'')}" placeholder="例: 10001234(01)">
@@ -2819,10 +2826,17 @@ function renderCompanySettings() {
 
     <!-- ISMS -->
     <div class="cs-cert-row">
-      <div class="cs-cert-left">
-        <div class="cs-label" style="margin-bottom:6px">ISMS認証</div>
-        <label class="toggle-switch"><input type="checkbox" id="cs-isms" ${chk(c.isms)} onchange="toggleCertNo('cs-isms-no',this.checked)"><span class="toggle-slider"></span></label>
-      </div>
+      <label class="cs-cert-check-card ${c.isms?'checked':''}">
+        <input type="checkbox" id="cs-isms" ${chk(c.isms)} onchange="toggleCertNo('cs-isms-no',this.checked);this.closest('.cs-cert-check-card').classList.toggle('checked',this.checked)">
+        <div class="cs-cert-check-icon">
+          <svg viewBox="0 0 20 20" width="18" height="18"><path d="M10 2l2 5h5l-4 3 1.5 5L10 12l-4.5 3L7 10 3 7h5z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+        </div>
+        <div class="cs-cert-check-text">
+          <div class="cs-cert-check-name">ISMS認証</div>
+          <div class="cs-cert-check-desc">情報セキュリティマネジメントシステム</div>
+        </div>
+        <div class="cs-cert-check-badge">${c.isms ? '取得済' : '未取得'}</div>
+      </label>
       <div class="cs-cert-right" id="cs-isms-no" style="${c.isms?'':'display:none'}">
         <div class="cs-label">認証番号</div>
         <input class="input" id="cs-isms-num" value="${escHtml(c.ismsNo||'')}" placeholder="例: IS 12345">
@@ -2831,22 +2845,36 @@ function renderCompanySettings() {
 
     <!-- 労働者派遣事業許可 -->
     <div class="cs-cert-row">
-      <div class="cs-cert-left">
-        <div class="cs-label" style="margin-bottom:6px">労働者派遣事業許可</div>
-        <label class="toggle-switch"><input type="checkbox" id="cs-dispatch" ${chk(c.dispatchLicense)} onchange="toggleCertNo('cs-dispatch-no',this.checked)"><span class="toggle-slider"></span></label>
-      </div>
+      <label class="cs-cert-check-card ${c.dispatchLicense?'checked':''}">
+        <input type="checkbox" id="cs-dispatch" ${chk(c.dispatchLicense)} onchange="toggleCertNo('cs-dispatch-no',this.checked);this.closest('.cs-cert-check-card').classList.toggle('checked',this.checked)">
+        <div class="cs-cert-check-icon">
+          <svg viewBox="0 0 20 20" width="18" height="18"><rect x="3" y="4" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M7 9h6M7 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="cs-cert-check-text">
+          <div class="cs-cert-check-name">労働者派遣事業許可</div>
+          <div class="cs-cert-check-desc">厚生労働大臣許可</div>
+        </div>
+        <div class="cs-cert-check-badge">${c.dispatchLicense ? '取得済' : '未取得'}</div>
+      </label>
       <div class="cs-cert-right" id="cs-dispatch-no" style="${c.dispatchLicense?'':'display:none'}">
         <div class="cs-label">許可番号</div>
         <input class="input" id="cs-dispatch-num" value="${escHtml(c.dispatchLicenseNo||'')}" placeholder="例: 派13-012345">
       </div>
     </div>
 
-    <!-- 特定労働者派遣事業 -->
+    <!-- 有料職業紹介事業許可 -->
     <div class="cs-cert-row">
-      <div class="cs-cert-left">
-        <div class="cs-label" style="margin-bottom:6px">有料職業紹介事業許可</div>
-        <label class="toggle-switch"><input type="checkbox" id="cs-dispatch-sp" ${chk(c.dispatchSpecificLicense)} onchange="toggleCertNo('cs-dispatch-sp-no',this.checked)"><span class="toggle-slider"></span></label>
-      </div>
+      <label class="cs-cert-check-card ${c.dispatchSpecificLicense?'checked':''}">
+        <input type="checkbox" id="cs-dispatch-sp" ${chk(c.dispatchSpecificLicense)} onchange="toggleCertNo('cs-dispatch-sp-no',this.checked);this.closest('.cs-cert-check-card').classList.toggle('checked',this.checked)">
+        <div class="cs-cert-check-icon">
+          <svg viewBox="0 0 20 20" width="18" height="18"><rect x="3" y="4" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M7 9h6M7 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <div class="cs-cert-check-text">
+          <div class="cs-cert-check-name">有料職業紹介事業許可</div>
+          <div class="cs-cert-check-desc">厚生労働大臣許可</div>
+        </div>
+        <div class="cs-cert-check-badge">${c.dispatchSpecificLicense ? '取得済' : '未取得'}</div>
+      </label>
       <div class="cs-cert-right" id="cs-dispatch-sp-no" style="${c.dispatchSpecificLicense?'':'display:none'}">
         <div class="cs-label">許可番号</div>
         <input class="input" id="cs-dispatch-sp-num" value="${escHtml(c.dispatchSpecificLicenseNo||'')}" placeholder="例: 13-ユ-012345">
