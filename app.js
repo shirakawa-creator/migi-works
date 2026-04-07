@@ -1744,20 +1744,33 @@ function importContractsCSV(input) {
       const lines = parseCSVLines(text);
       if (lines.length < 2) { alert('データが見つかりません'); return; }
 
-      const headers = lines[0];
+      const headerRow = lines[0]; // CSVの1行目（日本語ラベル）
       const imported = [];
       const errors   = [];
+
+      // CSVヘッダー（日本語）→ データキー（英語）のマッピングを作成
+      const colMap = {}; // colIndex → key
+      CSV_LABELS.forEach((label, labelIdx) => {
+        const csvColIdx = headerRow.indexOf(label);
+        if (csvColIdx >= 0) {
+          colMap[csvColIdx] = CSV_HEADERS[labelIdx];
+        }
+      });
+
+      // マッピングできた列が少ない場合は警告
+      if (Object.keys(colMap).length < 4) {
+        alert(`ヘッダーが認識できません。\nCSVテンプレートをダウンロードして形式を確認してください。\n認識できたカラム数: ${Object.keys(colMap).length}`);
+        return;
+      }
 
       for (let i = 1; i < lines.length; i++) {
         const vals = lines[i];
         if (vals.length < 2 || vals.every(v => !v)) continue; // 空行スキップ
 
         const obj = {};
-        CSV_HEADERS.forEach((key, idx) => {
-          const labelIdx = CSV_LABELS.indexOf(headers[idx] || '');
-          const colIdx   = labelIdx >= 0 ? labelIdx : idx;
-          const val      = vals[colIdx] !== undefined ? vals[colIdx] : '';
-          // 数値変換
+        // 各列の値をキーにマッピング
+        Object.entries(colMap).forEach(([colIdx, key]) => {
+          const val = vals[Number(colIdx)] !== undefined ? vals[Number(colIdx)] : '';
           if (['monthly','clientLowerMonthly','minHours','maxHours','overRate','underRate','settlementUnit','paymentSite'].includes(key)) {
             obj[key] = Number(val) || 0;
           } else if (key === 'hasExpense') {
@@ -1769,15 +1782,12 @@ function importContractsCSV(input) {
 
         // 必須チェック
         if (!obj.name || !obj.engineer || !obj.start || !obj.end) {
-          errors.push(`行${i+1}: 案件名・作業者名・開始日・終了日は必須です`);
+          errors.push(`行${i+1}: 案件名「${obj.name||'空'}」・作業者「${obj.engineer||'空'}」・開始日・終了日は必須です`);
           continue;
         }
-        // IDがなければ自動生成
         if (!obj.id) obj.id = 'C-' + Date.now() + '-' + i;
-        // extendStatusのデフォルト
         if (!obj.extendStatus) obj.extendStatus = '未確認';
 
-        // 既存IDと重複チェック → 上書き or 新規追加
         const existing = CONTRACTS.findIndex(c => c.id === obj.id);
         if (existing >= 0) {
           CONTRACTS[existing] = { ...CONTRACTS[existing], ...obj };
@@ -1788,19 +1798,17 @@ function importContractsCSV(input) {
 
       CONTRACTS.push(...imported);
 
-      // 結果表示
-      let msg = `✓ ${imported.length}件を新規追加しました。`;
       const updated = lines.length - 1 - imported.length - errors.length;
+      let msg = `✓ ${imported.length}件を新規追加しました。`;
       if (updated > 0) msg += `\n${updated}件を更新しました。`;
-      if (errors.length > 0) msg += `\n\n⚠ エラー ${errors.length}件:\n${errors.slice(0,5).join('\n')}`;
+      if (errors.length > 0) msg += `\n\n⚠ スキップ ${errors.length}件:\n${errors.slice(0,5).join('\n')}`;
       alert(msg);
 
-      // 画面を更新
       document.getElementById('content-area').innerHTML = renderContractsView();
     } catch(err) {
       alert('CSVの読み込みに失敗しました。\n' + err.message);
     }
-    input.value = ''; // 同じファイルを再度選択できるようリセット
+    input.value = '';
   };
   reader.readAsText(file, 'UTF-8');
 }
