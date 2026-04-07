@@ -1843,9 +1843,21 @@ function importContractsCSV(input) {
 
       CONTRACTS.push(...imported);
 
-      let msg = `✓ ${imported.length}件を新規追加しました。`;
-      if (updated.length > 0) msg += `\n${updated.length}件を更新しました。`;
+      // 取り込んだ契約が含まれる月に自動で切り替え
+      const allNew = imported;
+      if (allNew.length > 0) {
+        // 最も古い開始日の月に合わせる（全件見やすいように）
+        const earliest = allNew
+          .map(c => c.start).filter(Boolean).sort()[0];
+        if (earliest) {
+          CONTRACT_VIEW_STATE.year  = parseInt(earliest.slice(0,4));
+          CONTRACT_VIEW_STATE.month = parseInt(earliest.slice(5,7));
+        }
+      }
+
+      let msg = `✓ ${imported.length}件を新規追加、${updated.length}件を更新しました。`;
       if (errors.length > 0) msg += `\n\n⚠ スキップ ${errors.length}件:\n${errors.slice(0,5).join('\n')}`;
+      if (allNew.length > 0) msg += `\n\n表示を ${CONTRACT_VIEW_STATE.year}年${CONTRACT_VIEW_STATE.month}月 に切り替えました。\n▶ ◀ で月を移動して全件確認できます。`;
       alert(msg);
 
       document.getElementById('content-area').innerHTML = renderContractsView();
