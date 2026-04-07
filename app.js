@@ -1740,57 +1740,102 @@ function importContractsCSV(input) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const text = e.target.result.replace(/^\uFEFF/, ''); // BOM除去
+      const text = e.target.result.replace(/^\uFEFF/, '');
       const lines = parseCSVLines(text);
       if (lines.length < 2) { alert('データが見つかりません'); return; }
 
-      const headerRow = lines[0]; // CSVの1行目（日本語ラベル）
+      const headers = lines[0];
       const imported = [];
+      const updated  = [];
       const errors   = [];
 
-      // CSVヘッダー（日本語）→ データキー（英語）のマッピングを作成
-      const colMap = {}; // colIndex → key
-      CSV_LABELS.forEach((label, labelIdx) => {
-        const csvColIdx = headerRow.indexOf(label);
-        if (csvColIdx >= 0) {
-          colMap[csvColIdx] = CSV_HEADERS[labelIdx];
-        }
-      });
+      // カラムインデックスを取得するヘルパー
+      const col = (name) => headers.indexOf(name);
 
-      // マッピングできた列が少ない場合は警告
-      if (Object.keys(colMap).length < 4) {
-        alert(`ヘッダーが認識できません。\nCSVテンプレートをダウンロードして形式を確認してください。\n認識できたカラム数: ${Object.keys(colMap).length}`);
-        return;
-      }
+      // CSVフォーマットの判定（添付フォーマット or 旧フォーマット）
+      const isNewFormat = col('作業者名') >= 0 && col('提案先の会社名') >= 0;
 
       for (let i = 1; i < lines.length; i++) {
-        const vals = lines[i];
-        if (vals.length < 2 || vals.every(v => !v)) continue; // 空行スキップ
+        const v = lines[i];
+        if (v.length < 3 || v.every(x => !x.trim())) continue;
 
-        const obj = {};
-        // 各列の値をキーにマッピング
-        Object.entries(colMap).forEach(([colIdx, key]) => {
-          const val = vals[Number(colIdx)] !== undefined ? vals[Number(colIdx)] : '';
-          if (['monthly','clientLowerMonthly','minHours','maxHours','overRate','underRate','settlementUnit','paymentSite'].includes(key)) {
-            obj[key] = Number(val) || 0;
-          } else if (key === 'hasExpense') {
-            obj[key] = val === 'true' || val === '1';
-          } else {
-            obj[key] = val;
-          }
-        });
+        const get = (name) => (v[col(name)] || '').trim();
+        const getNum = (name) => Number(get(name).replace(/[^0-9.]/g, '')) || 0;
+
+        let obj = {};
+
+        if (isNewFormat) {
+          // ── 添付CSVフォーマット ──
+          const idRaw = get('契約管理番号') || get('システム内書類番号');
+          obj = {
+            id:               idRaw || ('C-' + Date.now() + '-' + i),
+            name:             get('作業内容'),
+            engineer:         get('作業者名').replace(/\u3000/g, ' '),
+            start:            get('契約開始日'),
+            end:              get('契約終了日'),
+            extendMonths:     get('通算契約期間'),
+            extendStatus:     '未確認',
+
+            // 提案先（上位）
+            clientUpper:      get('提案先の会社名'),
+            clientUpperDept:  get('提案先の担当者名(延長)') || get('提案先の担当者名(経理)'),
+            clientUpperJobType: get('提案先の契約種別'),
+
+            // 所属先（下位）
+            clientLower:      get('所属先の会社名'),
+            clientLowerDept:  get('所属先の担当者名(延長)') || get('所属先の担当者名(経理)'),
+            clientLowerJobType: get('所属先の契約種別'),
+
+            // 提案先 契約条件
+            monthly:          getNum('提案先への契約単価'),
+            minHours:         getNum('提案先への下限時間'),
+            maxHours:         getNum('提案先への上限時間'),
+            overRate:         getNum('提案先への超過単価'),
+            underRate:        getNum('提案先への控除単価'),
+            settlementUnit:   getNum('提案先の精算単位(分)') || 60,
+            paymentSite:      get('提案先の支払サイト').replace(/[^0-9]/g, '') || '55',
+            note:             get('提案先の備考'),
+
+            // 所属先 契約条件
+            clientLowerMonthly: getNum('所属先への契約単価'),
+
+            // その他
+            closingDay:       get('締め日'),
+            accountManager:   get('自社の事務担当者'),
+            selfNote:         get('提案先の社内メモ') || get('所属先の社内メモ'),
+            hasExpense:       false,
+          };
+        } else {
+          // ── 旧フォーマット（MIGI WORKS CSV出力）──
+          const colMap = {};
+          CSV_LABELS.forEach((label, idx) => {
+            const ci = headers.indexOf(label);
+            if (ci >= 0) colMap[ci] = CSV_HEADERS[idx];
+          });
+          CSV_HEADERS.forEach((key, idx) => {
+            const val = (v[idx] || '').trim();
+            if (['monthly','clientLowerMonthly','minHours','maxHours','overRate','underRate','settlementUnit','paymentSite'].includes(key)) {
+              obj[key] = Number(val) || 0;
+            } else if (key === 'hasExpense') {
+              obj[key] = val === 'true' || val === '1';
+            } else {
+              obj[key] = val;
+            }
+          });
+          if (!obj.id) obj.id = 'C-' + Date.now() + '-' + i;
+          if (!obj.extendStatus) obj.extendStatus = '未確認';
+        }
 
         // 必須チェック
         if (!obj.name || !obj.engineer || !obj.start || !obj.end) {
-          errors.push(`行${i+1}: 案件名「${obj.name||'空'}」・作業者「${obj.engineer||'空'}」・開始日・終了日は必須です`);
+          errors.push(`行${i+1}: 作業内容「${obj.name||'空'}」作業者「${obj.engineer||'空'}」開始日・終了日が必要です`);
           continue;
         }
-        if (!obj.id) obj.id = 'C-' + Date.now() + '-' + i;
-        if (!obj.extendStatus) obj.extendStatus = '未確認';
 
-        const existing = CONTRACTS.findIndex(c => c.id === obj.id);
-        if (existing >= 0) {
-          CONTRACTS[existing] = { ...CONTRACTS[existing], ...obj };
+        const existIdx = CONTRACTS.findIndex(c => c.id === obj.id);
+        if (existIdx >= 0) {
+          CONTRACTS[existIdx] = { ...CONTRACTS[existIdx], ...obj };
+          updated.push(obj.name);
         } else {
           imported.push(obj);
         }
@@ -1798,9 +1843,8 @@ function importContractsCSV(input) {
 
       CONTRACTS.push(...imported);
 
-      const updated = lines.length - 1 - imported.length - errors.length;
       let msg = `✓ ${imported.length}件を新規追加しました。`;
-      if (updated > 0) msg += `\n${updated}件を更新しました。`;
+      if (updated.length > 0) msg += `\n${updated.length}件を更新しました。`;
       if (errors.length > 0) msg += `\n\n⚠ スキップ ${errors.length}件:\n${errors.slice(0,5).join('\n')}`;
       alert(msg);
 
