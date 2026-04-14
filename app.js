@@ -3,6 +3,220 @@
    全機能: ログイン/チーム共有/超過控除計算/メールテンプレート
 ====================================================== */
 
+// ─── SUPABASE 設定 ────────────────────────────────────
+const SUPABASE_URL = 'https://vdybwmmcrysmubdjrtdp.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_hyNEHYH1FaArpcDcCJii3g_GKKWnyAd';
+
+// Supabase クライアント（CDNから読み込み）
+let supabase = null;
+
+function initSupabase() {
+  if (window.supabase && window.supabase.createClient) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    return true;
+  }
+  return false;
+}
+
+// ─── DB ヘルパー関数 ──────────────────────────────────
+
+// 契約データをDBから読み込み
+async function loadContractsFromDB() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.from('contracts').select('*').order('start_date', { ascending: false });
+    if (error) throw error;
+    if (data && data.length > 0) {
+      CONTRACTS.length = 0;
+      data.forEach(r => CONTRACTS.push(dbRowToContract(r)));
+    }
+  } catch(e) { console.error('契約読込エラー:', e); }
+}
+
+// 取引先データをDBから読み込み
+async function loadClientsFromDB() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.from('clients').select('*').order('name');
+    if (error) throw error;
+    if (data) {
+      CLIENTS.length = 0;
+      data.forEach(r => CLIENTS.push({ id:r.id, name:r.name, tel:r.tel||'', zip:r.zip||'', address:r.address||'', salesPerson:r.sales_person||'', salesEmail:r.sales_email||'', invoiceEmail:r.invoice_email||'' }));
+    }
+  } catch(e) { console.error('取引先読込エラー:', e); }
+}
+
+// 自社情報をDBから読み込み
+async function loadCompanyFromDB() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.from('company_settings').select('*').eq('id', 1).single();
+    if (error && error.code !== 'PGRST116') throw error;
+    if (data) {
+      MY_COMPANY = {
+        ...MY_COMPANY,
+        name: data.name||'', registrationNo: data.registration_no||'', tel: data.tel||'',
+        fax: data.fax||'', salesContact: data.sales_contact||'', address: data.address||'',
+        capital: data.capital||'', foundedDate: data.founded_date||'',
+        pmark: data.pmark||false, pmarkNo: data.pmark_no||'',
+        isms: data.isms||false, ismsNo: data.isms_no||'',
+        dispatchLicense: data.dispatch_license||false, dispatchLicenseNo: data.dispatch_license_no||'',
+        dispatchSpecificLicense: data.dispatch_specific_license||false, dispatchSpecificLicenseNo: data.dispatch_specific_license_no||'',
+        accountManager: data.account_manager||'',
+        bankAccount1: data.bank_account1||'', bankAccount2: data.bank_account2||'',
+        settlementUnit: data.settlement_unit||'月', closingDay: data.closing_day||'月末締め',
+        paymentSite: data.payment_site||'30',
+        ccMailList: data.cc_mail_list||'', bccMailList: data.bcc_mail_list||'',
+        salesPersons: data.sales_persons||[],
+      };
+    }
+  } catch(e) { console.error('自社情報読込エラー:', e); }
+}
+
+// 稼働データをDBから読み込み
+async function loadAttendanceFromDB(year, month) {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.from('attendance').select('*').eq('year', year).eq('month', month);
+    if (error) throw error;
+    if (data) {
+      data.forEach(r => {
+        const key = `${r.contract_id}-${r.year}-${r.month}`;
+        ATTENDANCE_DATA[key] = {
+          hours: r.hours||'', minutes: r.minutes||'',
+          expense: r.expense||'0', misc: r.misc||'0',
+          confirmed: r.confirmed||false,
+          invoiceSent: r.invoice_sent||false,
+          invoiceSentAt: r.invoice_sent_at||'',
+          urlSent: r.url_sent||false,
+          uploadedFiles: r.uploaded_files||[],
+        };
+      });
+    }
+  } catch(e) { console.error('稼働データ読込エラー:', e); }
+}
+
+// 契約をDBに保存
+async function saveContractToDB(contract) {
+  if (!supabase) return;
+  const row = contractToDbRow(contract);
+  try {
+    const { error } = await supabase.from('contracts').upsert(row, { onConflict: 'id' });
+    if (error) throw error;
+  } catch(e) { console.error('契約保存エラー:', e); }
+}
+
+// 契約をDBから削除
+async function deleteContractFromDB(id) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from('contracts').delete().eq('id', id);
+    if (error) throw error;
+  } catch(e) { console.error('契約削除エラー:', e); }
+}
+
+// 取引先をDBに保存
+async function saveClientToDB(client) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from('clients').upsert({
+      id: client.id, name: client.name, tel: client.tel||'', zip: client.zip||'',
+      address: client.address||'', sales_person: client.salesPerson||'',
+      sales_email: client.salesEmail||'', invoice_email: client.invoiceEmail||'',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+    if (error) throw error;
+  } catch(e) { console.error('取引先保存エラー:', e); }
+}
+
+// 取引先をDBから削除
+async function deleteClientFromDB(id) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from('clients').delete().eq('id', id);
+    if (error) throw error;
+  } catch(e) { console.error('取引先削除エラー:', e); }
+}
+
+// 自社情報をDBに保存
+async function saveCompanyToDB(data) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from('company_settings').upsert({
+      id: 1,
+      name: data.name, registration_no: data.registrationNo, tel: data.tel,
+      fax: data.fax, sales_contact: data.salesContact, address: data.address,
+      capital: data.capital, founded_date: data.foundedDate,
+      pmark: data.pmark, pmark_no: data.pmarkNo,
+      isms: data.isms, isms_no: data.ismsNo,
+      dispatch_license: data.dispatchLicense, dispatch_license_no: data.dispatchLicenseNo,
+      dispatch_specific_license: data.dispatchSpecificLicense, dispatch_specific_license_no: data.dispatchSpecificLicenseNo,
+      account_manager: data.accountManager,
+      bank_account1: data.bankAccount1, bank_account2: data.bankAccount2,
+      settlement_unit: data.settlementUnit, closing_day: data.closingDay,
+      payment_site: data.paymentSite,
+      cc_mail_list: data.ccMailList, bcc_mail_list: data.bccMailList,
+      sales_persons: data.salesPersons||[],
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+    if (error) throw error;
+  } catch(e) { console.error('自社情報保存エラー:', e); }
+}
+
+// 稼働データをDBに保存
+async function saveAttendanceToDB(contractId, year, month, d) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from('attendance').upsert({
+      contract_id: contractId, year, month,
+      hours: d.hours||'', minutes: d.minutes||'',
+      expense: d.expense||'0', misc: d.misc||'0',
+      confirmed: d.confirmed||false,
+      invoice_sent: d.invoiceSent||false,
+      invoice_sent_at: d.invoiceSentAt||null,
+      url_sent: d.urlSent||false,
+      uploaded_files: d.uploadedFiles||[],
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'contract_id,year,month' });
+    if (error) throw error;
+  } catch(e) { console.error('稼働データ保存エラー:', e); }
+}
+
+// DB行 → 契約オブジェクト変換
+function dbRowToContract(r) {
+  return {
+    id: r.id, name: r.name, engineer: r.engineer,
+    clientUpper: r.client_upper||'', clientUpperDept: r.client_upper_dept||'', clientUpperJobType: r.client_upper_job_type||'',
+    clientLower: r.client_lower||'', clientLowerDept: r.client_lower_dept||'', clientLowerJobType: r.client_lower_job_type||'',
+    start: r.start_date, end: r.end_date,
+    extendStatus: r.extend_status||'未確認', extendMonths: r.extend_months||'',
+    monthly: r.monthly||0, clientLowerMonthly: r.client_lower_monthly||0,
+    minHours: r.min_hours||140, maxHours: r.max_hours||180,
+    overRate: r.over_rate||0, underRate: r.under_rate||0,
+    settlementUnit: r.settlement_unit||60, paymentSite: r.payment_site||'',
+    closingDay: r.closing_day||'', note: r.note||'', selfNote: r.self_note||'',
+    hasExpense: r.has_expense||false, accountManager: r.account_manager||'',
+  };
+}
+
+// 契約オブジェクト → DB行変換
+function contractToDbRow(c) {
+  return {
+    id: c.id, name: c.name, engineer: c.engineer,
+    client_upper: c.clientUpper||'', client_upper_dept: c.clientUpperDept||'', client_upper_job_type: c.clientUpperJobType||'',
+    client_lower: c.clientLower||'', client_lower_dept: c.clientLowerDept||'', client_lower_job_type: c.clientLowerJobType||'',
+    start_date: c.start, end_date: c.end,
+    extend_status: c.extendStatus||'未確認', extend_months: String(c.extendMonths||''),
+    monthly: c.monthly||0, client_lower_monthly: c.clientLowerMonthly||0,
+    min_hours: c.minHours||140, max_hours: c.maxHours||180,
+    over_rate: c.overRate||0, under_rate: c.underRate||0,
+    settlement_unit: c.settlementUnit||60, payment_site: c.paymentSite||'',
+    closing_day: c.closingDay||'', note: c.note||'', self_note: c.selfNote||'',
+    has_expense: c.hasExpense||false, account_manager: c.accountManager||'',
+    updated_at: new Date().toISOString()
+  };
+}
+
 // ─── STATE ───────────────────────────────────────────
 const STATE = {
   currentUser: null,
@@ -289,26 +503,75 @@ const SALES_PIPELINE = {
 function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pass  = document.getElementById('login-password').value;
-  const user  = USERS.find(u => u.email === email && u.password === pass);
-  if (!user) {
-    document.getElementById('login-error').classList.remove('hidden');
-    return;
+
+  if (supabase) {
+    // Supabase Auth ログイン
+    document.getElementById('login-error').classList.add('hidden');
+    supabase.auth.signInWithPassword({ email, password: pass })
+      .then(async ({ data, error }) => {
+        if (error) {
+          document.getElementById('login-error').classList.remove('hidden');
+          return;
+        }
+        // ユーザー情報をローカルUSERSから補完（名前・役職）
+        const localUser = USERS.find(u => u.email === email);
+        STATE.currentUser = localUser || { email, name: email.split('@')[0], role:'メンバー', initials:'—', color:'#6b7280' };
+        await onLoginSuccess();
+      });
+  } else {
+    // フォールバック：ローカル認証
+    const user = USERS.find(u => u.email === email && u.password === pass);
+    if (!user) { document.getElementById('login-error').classList.remove('hidden'); return; }
+    STATE.currentUser = user;
+    onLoginSuccess();
   }
-  STATE.currentUser = user;
+}
+
+async function onLoginSuccess() {
+  const user = STATE.currentUser;
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('sb-username').textContent = user.name;
   document.getElementById('sb-userrole').textContent = user.role;
-  document.getElementById('sb-avatar').textContent = user.initials;
-  document.getElementById('sb-avatar').style.background = `linear-gradient(135deg, ${user.color}, ${shadeColor(user.color,-20)})`;
+  document.getElementById('sb-avatar').textContent = user.initials || user.name.slice(0,2);
+  document.getElementById('sb-avatar').style.background = `linear-gradient(135deg, ${user.color||'#00c896'}, ${shadeColor(user.color||'#00c896',-20)})`;
+
+  // DBからデータを読み込み
+  if (supabase) {
+    showLoadingToast('データを読み込み中...');
+    await Promise.all([
+      loadContractsFromDB(),
+      loadClientsFromDB(),
+      loadCompanyFromDB(),
+    ]);
+    hideLoadingToast();
+  }
+
   showView('dashboard', document.querySelector('.nav-item[data-view="dashboard"]'));
 }
 
 function doLogout() {
+  if (supabase) supabase.auth.signOut();
   STATE.currentUser = null;
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('login-error').classList.add('hidden');
+}
+
+function showLoadingToast(msg) {
+  let t = document.getElementById('loading-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'loading-toast';
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);display:flex;align-items:center;gap:10px';
+    document.body.appendChild(t);
+  }
+  t.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" style="animation:spin 1s linear infinite"><circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,.3)" stroke-width="2" fill="none"/><path d="M8 2a6 6 0 0 1 6 6" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none"/></svg>${msg}`;
+  t.style.display = 'flex';
+}
+function hideLoadingToast() {
+  const t = document.getElementById('loading-toast');
+  if (t) t.style.display = 'none';
 }
 
 function fillDemo(email, pass, role) {
@@ -932,13 +1195,16 @@ function confirmAtt(contractId) {
     if (!confirm('稼働時間が未入力です。このまま確定しますか？')) return;
   }
   d.confirmed = true;
+  saveAttendanceToDB(contractId, year, month, d); // DB保存
   refreshAttCard(contractId);
   refreshAttSummary();
 }
 
 function unconfirmAtt(contractId) {
   const { year, month } = ATTENDANCE_VIEW_STATE;
-  getAttData(contractId, year, month).confirmed = false;
+  const d = getAttData(contractId, year, month);
+  d.confirmed = false;
+  saveAttendanceToDB(contractId, year, month, d); // DB保存
   refreshAttCard(contractId);
   refreshAttSummary();
 }
@@ -970,9 +1236,10 @@ function refreshAttSummary() {
     <span class="att-stat-item uninputted">未入力：<strong>${uninputted}</strong>件</span>`;
 }
 
-function changeAttMonth(year, month) {
+async function changeAttMonth(year, month) {
   ATTENDANCE_VIEW_STATE.year = year;
   ATTENDANCE_VIEW_STATE.month = month;
+  if (supabase) await loadAttendanceFromDB(year, month);
   document.getElementById('content-area').innerHTML = renderAttendanceView();
 }
 
@@ -3202,6 +3469,7 @@ function saveCompanySettings() {
     twoFactorAuth:      document.getElementById('cs-2fa')?.checked || false,
     salesPersons:       MY_COMPANY.salesPersons || [],
   };
+  saveCompanyToDB(MY_COMPANY); // DB保存
   // Show saved toast
   const toast = document.createElement('div');
   toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);animation:modalIn .2s ease';
@@ -3365,14 +3633,21 @@ function saveClient(idx) {
     invoiceEmail: document.getElementById('cl-invoice-email').value,
   };
   if (idx === null) CLIENTS.push(cl); else CLIENTS[idx] = cl;
+  saveClientToDB(cl); // DB保存
   closeModal('contract-modal');
   showView('clients', document.querySelector('[data-view="clients"]'));
-  alert('取引先を保存しました ✓');
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+  toast.textContent = '✓ 取引先を保存しました';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
 }
 
 function deleteClient(idx) {
   if (!confirm(`「${CLIENTS[idx].name}」を削除しますか？`)) return;
+  const id = CLIENTS[idx].id;
   CLIENTS.splice(idx, 1);
+  deleteClientFromDB(id); // DB削除
   showView('clients', document.querySelector('[data-view="clients"]'));
 }
 
@@ -3698,8 +3973,46 @@ function toggleDDInputs(side, period) {
 function saveContractForm() {
   const name = document.getElementById('cf-jobname')?.value.trim();
   if (!name) { alert('案件名を入力してください'); return; }
-  alert(`契約「${name}」を登録しました ✓`);
+
+  // 新しい契約オブジェクトを構築
+  const newContract = {
+    id: 'C-' + Date.now(),
+    name,
+    engineer: document.getElementById('cf-engineer')?.value.trim() || '',
+    clientUpper: document.getElementById('cf-client-upper')?.value || '',
+    clientUpperDept: document.getElementById('cf-client-upper-dept')?.value || '',
+    clientUpperJobType: document.getElementById('cf-upper-type')?.value || '',
+    clientLower: document.getElementById('cf-client-lower')?.value || '',
+    clientLowerDept: document.getElementById('cf-client-lower-dept')?.value || '',
+    clientLowerJobType: document.getElementById('cf-lower-type')?.value || '',
+    start: document.getElementById('cf-start')?.value || '',
+    end: document.getElementById('cf-end')?.value || '',
+    extendStatus: '未確認',
+    extendMonths: '',
+    monthly: Number(document.getElementById('cf-upper-price')?.value) || 0,
+    clientLowerMonthly: Number(document.getElementById('cf-lower-price')?.value) || 0,
+    minHours: Number(document.getElementById('cf-upper-min')?.value) || 140,
+    maxHours: Number(document.getElementById('cf-upper-max')?.value) || 180,
+    overRate: Number(document.getElementById('cf-upper-over')?.value) || 0,
+    underRate: Number(document.getElementById('cf-upper-under')?.value) || 0,
+    settlementUnit: Number(document.getElementById('cf-upper-unit')?.value) || 60,
+    paymentSite: document.getElementById('cf-upper-payment')?.value || '',
+    closingDay: document.getElementById('cf-closing')?.value || '',
+    note: document.getElementById('cf-upper-note')?.value || '',
+    selfNote: '',
+    hasExpense: false,
+  };
+
+  CONTRACTS.unshift(newContract);
+  saveContractToDB(newContract); // DB保存
+
   closeModal('contract-modal');
+  document.getElementById('content-area').innerHTML = renderContractsView();
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+  toast.textContent = `✓ 契約「${name}」を登録しました`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
 }
 
 function updateCFRates() { calcContractRates('upper'); calcContractRates('lower'); }
