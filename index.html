@@ -241,10 +241,16 @@
 
 <script src="app.js"></script>
 <script>
-  // Supabase初期化（CDN読み込み後）
-  window.addEventListener('load', () => {
-    initSupabase();
-  });
+  // Supabase CDN読み込み完了を確実に待つ
+  function tryInitSupabase() {
+    if (window.supabase && window.supabase.createClient) {
+      initSupabase();
+      console.log('Supabase initialized');
+    } else {
+      setTimeout(tryInitSupabase, 100); // 100ms後に再試行
+    }
+  }
+  document.addEventListener('DOMContentLoaded', tryInitSupabase);
 </script>
 <style>
 @keyframes spin { to { transform: rotate(360deg); } }

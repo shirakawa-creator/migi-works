@@ -504,24 +504,39 @@ function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pass  = document.getElementById('login-password').value;
 
+  // Supabaseが未初期化なら再試行
+  if (!supabase) initSupabase();
+
   if (supabase) {
-    // Supabase Auth ログイン
     document.getElementById('login-error').classList.add('hidden');
     supabase.auth.signInWithPassword({ email, password: pass })
       .then(async ({ data, error }) => {
         if (error) {
+          console.error('ログインエラー:', error.message);
           document.getElementById('login-error').classList.remove('hidden');
           return;
         }
-        // ユーザー情報をローカルUSERSから補完（名前・役職）
         const localUser = USERS.find(u => u.email === email);
-        STATE.currentUser = localUser || { email, name: email.split('@')[0], role:'メンバー', initials:'—', color:'#6b7280' };
+        STATE.currentUser = localUser || {
+          email,
+          name: email.split('@')[0],
+          role: 'メンバー',
+          initials: email.slice(0,2).toUpperCase(),
+          color: '#00c896'
+        };
         await onLoginSuccess();
+      })
+      .catch(err => {
+        console.error('ログイン通信エラー:', err);
+        document.getElementById('login-error').classList.remove('hidden');
       });
   } else {
-    // フォールバック：ローカル認証
+    // フォールバック：ローカル認証（Supabase CDN未読み込み時）
     const user = USERS.find(u => u.email === email && u.password === pass);
-    if (!user) { document.getElementById('login-error').classList.remove('hidden'); return; }
+    if (!user) {
+      document.getElementById('login-error').classList.remove('hidden');
+      return;
+    }
     STATE.currentUser = user;
     onLoginSuccess();
   }
