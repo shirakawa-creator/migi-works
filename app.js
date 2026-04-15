@@ -8,11 +8,11 @@ const SUPABASE_URL = 'https://vdybwmmcrysmubdjrtdp.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_hyNEHYH1FaArpcDcCJii3g_GKKWnyAd';
 
 // Supabase クライアント（CDNから読み込み）
-let supabase = null;
+let _sb = null; // Supabase client
 
 function initSupabase() {
   if (window.supabase && window.supabase.createClient) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     return true;
   }
   return false;
@@ -22,9 +22,9 @@ function initSupabase() {
 
 // 契約データをDBから読み込み
 async function loadContractsFromDB() {
-  if (!supabase) return;
+  if (!_sb) return;
   try {
-    const { data, error } = await supabase.from('contracts').select('*').order('start_date', { ascending: false });
+    const { data, error } = await _sb.from('contracts').select('*').order('start_date', { ascending: false });
     if (error) throw error;
     if (data && data.length > 0) {
       CONTRACTS.length = 0;
@@ -35,9 +35,9 @@ async function loadContractsFromDB() {
 
 // 取引先データをDBから読み込み
 async function loadClientsFromDB() {
-  if (!supabase) return;
+  if (!_sb) return;
   try {
-    const { data, error } = await supabase.from('clients').select('*').order('name');
+    const { data, error } = await _sb.from('clients').select('*').order('name');
     if (error) throw error;
     if (data) {
       CLIENTS.length = 0;
@@ -48,9 +48,9 @@ async function loadClientsFromDB() {
 
 // 自社情報をDBから読み込み
 async function loadCompanyFromDB() {
-  if (!supabase) return;
+  if (!_sb) return;
   try {
-    const { data, error } = await supabase.from('company_settings').select('*').eq('id', 1).single();
+    const { data, error } = await _sb.from('company_settings').select('*').eq('id', 1).single();
     if (error && error.code !== 'PGRST116') throw error;
     if (data) {
       MY_COMPANY = {
@@ -75,9 +75,9 @@ async function loadCompanyFromDB() {
 
 // 稼働データをDBから読み込み
 async function loadAttendanceFromDB(year, month) {
-  if (!supabase) return;
+  if (!_sb) return;
   try {
-    const { data, error } = await supabase.from('attendance').select('*').eq('year', year).eq('month', month);
+    const { data, error } = await _sb.from('attendance').select('*').eq('year', year).eq('month', month);
     if (error) throw error;
     if (data) {
       data.forEach(r => {
@@ -98,28 +98,28 @@ async function loadAttendanceFromDB(year, month) {
 
 // 契約をDBに保存
 async function saveContractToDB(contract) {
-  if (!supabase) return;
+  if (!_sb) return;
   const row = contractToDbRow(contract);
   try {
-    const { error } = await supabase.from('contracts').upsert(row, { onConflict: 'id' });
+    const { error } = await _sb.from('contracts').upsert(row, { onConflict: 'id' });
     if (error) throw error;
   } catch(e) { console.error('契約保存エラー:', e); }
 }
 
 // 契約をDBから削除
 async function deleteContractFromDB(id) {
-  if (!supabase) return;
+  if (!_sb) return;
   try {
-    const { error } = await supabase.from('contracts').delete().eq('id', id);
+    const { error } = await _sb.from('contracts').delete().eq('id', id);
     if (error) throw error;
   } catch(e) { console.error('契約削除エラー:', e); }
 }
 
 // 取引先をDBに保存
 async function saveClientToDB(client) {
-  if (!supabase) return;
+  if (!_sb) return;
   try {
-    const { error } = await supabase.from('clients').upsert({
+    const { error } = await _sb.from('clients').upsert({
       id: client.id, name: client.name, tel: client.tel||'', zip: client.zip||'',
       address: client.address||'', sales_person: client.salesPerson||'',
       sales_email: client.salesEmail||'', invoice_email: client.invoiceEmail||'',
@@ -131,18 +131,18 @@ async function saveClientToDB(client) {
 
 // 取引先をDBから削除
 async function deleteClientFromDB(id) {
-  if (!supabase) return;
+  if (!_sb) return;
   try {
-    const { error } = await supabase.from('clients').delete().eq('id', id);
+    const { error } = await _sb.from('clients').delete().eq('id', id);
     if (error) throw error;
   } catch(e) { console.error('取引先削除エラー:', e); }
 }
 
 // 自社情報をDBに保存
 async function saveCompanyToDB(data) {
-  if (!supabase) return;
+  if (!_sb) return;
   try {
-    const { error } = await supabase.from('company_settings').upsert({
+    const { error } = await _sb.from('company_settings').upsert({
       id: 1,
       name: data.name, registration_no: data.registrationNo, tel: data.tel,
       fax: data.fax, sales_contact: data.salesContact, address: data.address,
@@ -165,9 +165,9 @@ async function saveCompanyToDB(data) {
 
 // 稼働データをDBに保存
 async function saveAttendanceToDB(contractId, year, month, d) {
-  if (!supabase) return;
+  if (!_sb) return;
   try {
-    const { error } = await supabase.from('attendance').upsert({
+    const { error } = await _sb.from('attendance').upsert({
       contract_id: contractId, year, month,
       hours: d.hours||'', minutes: d.minutes||'',
       expense: d.expense||'0', misc: d.misc||'0',
@@ -505,11 +505,11 @@ function doLogin() {
   const pass  = document.getElementById('login-password').value;
 
   // Supabaseが未初期化なら再試行
-  if (!supabase) initSupabase();
+  if (!_sb) initSupabase();
 
-  if (supabase) {
+  if (_sb) {
     document.getElementById('login-error').classList.add('hidden');
-    supabase.auth.signInWithPassword({ email, password: pass })
+    _sb.auth.signInWithPassword({ email, password: pass })
       .then(async ({ data, error }) => {
         if (error) {
           console.error('ログインエラー:', error.message);
@@ -552,7 +552,7 @@ async function onLoginSuccess() {
   document.getElementById('sb-avatar').style.background = `linear-gradient(135deg, ${user.color||'#00c896'}, ${shadeColor(user.color||'#00c896',-20)})`;
 
   // DBからデータを読み込み
-  if (supabase) {
+  if (_sb) {
     showLoadingToast('データを読み込み中...');
     await Promise.all([
       loadContractsFromDB(),
@@ -566,7 +566,7 @@ async function onLoginSuccess() {
 }
 
 function doLogout() {
-  if (supabase) supabase.auth.signOut();
+  if (_sb) _sb.auth.signOut();
   STATE.currentUser = null;
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login-screen').classList.remove('hidden');
@@ -1254,7 +1254,7 @@ function refreshAttSummary() {
 async function changeAttMonth(year, month) {
   ATTENDANCE_VIEW_STATE.year = year;
   ATTENDANCE_VIEW_STATE.month = month;
-  if (supabase) await loadAttendanceFromDB(year, month);
+  if (_sb) await loadAttendanceFromDB(year, month);
   document.getElementById('content-area').innerHTML = renderAttendanceView();
 }
 
