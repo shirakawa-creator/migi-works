@@ -70,6 +70,8 @@ async function loadCompanyFromDB() {
         salesPersons: data.sales_persons||[],
         companySeal: data.company_seal||'',
       };
+      // 印影をキャッシュ（帳票生成時に確実に参照できるよう）
+      window._companySealCache = MY_COMPANY.companySeal;
     }
   } catch(e) { console.error('自社情報読込エラー:', e); }
 }
@@ -1575,6 +1577,9 @@ function openAttPdfPreview(contractId, year, month) {
 
   const workHoursStr = `${hoursH} 時間 ${String(hoursM).padStart(2,'0')} 分`;
 
+  // 印影データを明示的にセット（DBから読み込み済みのデータを確実に使う）
+  window._companySealCache = MY_COMPANY.companySeal || window._companySealCache || '';
+
   const content = buildInvoiceDoc(
     window._docState.num, issueDate, dueDate, regNo,
     c.clientUpper, compName, compAddr, compBank,
@@ -2792,6 +2797,15 @@ function buildDocInner(type, color, num, client, item, amount, tax, total, note,
 }
 
 // ── 御請求書 ─────────────────────────────────────────
+// 会社印HTMLを生成するヘルパー
+function companySealHtml(size) {
+  size = size || 80;
+  // MY_COMPANY.companySeal または保存済みの印影を参照
+  const seal = MY_COMPANY.companySeal || window._companySealCache || '';
+  if (!seal) return '';
+  return `<img src="${seal}" style="width:${size}px;height:${size}px;object-fit:contain;opacity:0.9;flex-shrink:0;mix-blend-mode:multiply" alt="会社印">`;
+}
+
 function buildInvoiceDoc(num, issueDate, dueDate, regNo, clientName, compName, compAddr, compBank, engName, workMonth, baseAmt, overH, overRate, underH, underRate, subtotal, expense, misc, taxAmt, grandTotal, period, contract, workHoursStr, overHour, overMin, underHour, underMin, overAmt, underAmt) {
   const personName = document.getElementById('doc-from-person')?.value || '';
   const senderName = document.getElementById('doc-from-company')?.value || compName;
@@ -2814,15 +2828,16 @@ function buildInvoiceDoc(num, issueDate, dueDate, regNo, clientName, compName, c
 <div style="text-align:center;font-size:22px;font-weight:700;letter-spacing:10px;margin:18px 0 20px">御　請　求　書</div>
 
 <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
-  <div style="border-left:3px solid #222;padding-left:12px;font-size:10px;color:#555;line-height:1.9;text-align:right">
-    <div style="font-size:11px;color:#111">${escHtml(senderAddr).replace(/\n/g,'<br>')}</div>
-    <div style="font-size:13px;font-weight:700;color:#111">${escHtml(senderName)}</div>
-    <div>担当: ${escHtml(personName)||'—'}</div>
-    <div style="margin-top:6px;font-size:9px">【お振込み先】<br>${escHtml(compBank).replace(/\n/g,'<br>')}</div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div style="border-left:3px solid #222;padding-left:12px;font-size:10px;color:#555;line-height:1.9;text-align:right">
+      <div style="font-size:11px;color:#111">${escHtml(senderAddr).replace(/\n/g,'<br>')}</div>
+      <div style="font-size:13px;font-weight:700;color:#111">${escHtml(senderName)}</div>
+      <div>担当: ${escHtml(personName)||'—'}</div>
+      <div style="margin-top:6px;font-size:9px">【お振込み先】<br>${escHtml(compBank).replace(/\n/g,'<br>')}</div>
+    </div>
+    ${companySealHtml(80)}
   </div>
-</div>
-
-<div style="font-size:10px;color:#555;margin-bottom:10px">以下の通りご請求申し上げます。<br>不明な点がございましたら、御連絡頂けますと幸いです。</div>
+</div><br>不明な点がございましたら、御連絡頂けますと幸いです。</div>
 
 <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
   <tr><td style="background:#333;color:#fff;font-weight:700;font-size:10px;padding:7px 12px;width:100px">御請求金額</td><td style="border:1px solid #ccc;border-left:none;padding:7px 14px;font-size:14px;font-weight:700">¥ ${grandTotal.toLocaleString()}，000 - <span style="font-size:10px;font-weight:400;margin-left:6px">（税込）</span></td></tr>
@@ -2892,10 +2907,13 @@ function buildOrderDoc(num, issueDate, clientName, compName, compAddr, engName, 
 <div style="text-align:center;font-size:22px;font-weight:700;letter-spacing:10px;margin:18px 0 20px">発　注　書</div>
 
 <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-  <div style="border-left:3px solid #222;padding-left:12px;font-size:10px;color:#555;line-height:1.9;text-align:right">
-    <div style="font-size:11px;color:#111">${escHtml(senderAddr).replace(/\n/g,'<br>')}</div>
-    <div style="font-size:13px;font-weight:700;color:#111">${escHtml(senderName)}</div>
-    <div>担当: ${escHtml(personName)||'—'}</div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div style="border-left:3px solid #222;padding-left:12px;font-size:10px;color:#555;line-height:1.9;text-align:right">
+      <div style="font-size:11px;color:#111">${escHtml(senderAddr).replace(/\n/g,'<br>')}</div>
+      <div style="font-size:13px;font-weight:700;color:#111">${escHtml(senderName)}</div>
+      <div>担当: ${escHtml(personName)||'—'}</div>
+    </div>
+    ${companySealHtml(80)}
   </div>
 </div>
 
@@ -2945,10 +2963,13 @@ function buildQuoteDoc(num, issueDate, clientName, compName, compAddr, compBank,
 </div>
 <div style="text-align:center;font-size:22px;font-weight:700;letter-spacing:10px;margin:18px 0 20px">御　見　積　書</div>
 <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
-  <div style="border-left:3px solid #222;padding-left:12px;font-size:10px;color:#555;line-height:1.9;text-align:right">
-    <div style="font-size:11px;color:#111">${escHtml(senderAddr).replace(/\n/g,'<br>')}</div>
-    <div style="font-size:13px;font-weight:700;color:#111">${escHtml(senderName)}</div>
-    <div>担当: ${escHtml(personName)||'—'}</div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div style="border-left:3px solid #222;padding-left:12px;font-size:10px;color:#555;line-height:1.9;text-align:right">
+      <div style="font-size:11px;color:#111">${escHtml(senderAddr).replace(/\n/g,'<br>')}</div>
+      <div style="font-size:13px;font-weight:700;color:#111">${escHtml(senderName)}</div>
+      <div>担当: ${escHtml(personName)||'—'}</div>
+    </div>
+    ${companySealHtml(80)}
   </div>
 </div>
 <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
@@ -3504,6 +3525,7 @@ function uploadCompanySeal(input) {
   reader.onload = e => {
     const dataUrl = e.target.result;
     MY_COMPANY.companySeal = dataUrl;
+    window._companySealCache = dataUrl;
     // プレビュー表示
     document.getElementById('cs-seal-img').src = dataUrl;
     document.getElementById('cs-seal-preview').style.display = '';
@@ -3522,6 +3544,7 @@ function uploadCompanySeal(input) {
 function removeCompanySeal() {
   if (!confirm('会社印を削除しますか？')) return;
   MY_COMPANY.companySeal = '';
+  window._companySealCache = '';
   document.getElementById('cs-seal-img').src = '';
   document.getElementById('cs-seal-preview').style.display = 'none';
   document.getElementById('cs-seal-upload-label').style.display = '';
