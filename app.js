@@ -68,6 +68,7 @@ async function loadCompanyFromDB() {
         paymentSite: data.payment_site||'30',
         ccMailList: data.cc_mail_list||'', bccMailList: data.bcc_mail_list||'',
         salesPersons: data.sales_persons||[],
+        companySeal: data.company_seal||'',
       };
     }
   } catch(e) { console.error('自社情報読込エラー:', e); }
@@ -157,6 +158,7 @@ async function saveCompanyToDB(data) {
       payment_site: data.paymentSite,
       cc_mail_list: data.ccMailList, bcc_mail_list: data.bccMailList,
       sales_persons: data.salesPersons||[],
+      company_seal: data.companySeal||'',
       updated_at: new Date().toISOString()
     }, { onConflict: 'id' });
     if (error) throw error;
@@ -3358,21 +3360,22 @@ function renderCompanySettings() {
     印鑑
   </div>
   <div class="cs-section-body">
-    <div class="cs-grid">
-      <div class="cs-field">
-        <div class="cs-label">個人の押印枠</div>
-        <div class="cs-seal-area" onclick="alert('印鑑画像をアップロードします')">
-          <svg viewBox="0 0 20 20" width="20" height="20"><path d="M10 3v10M6 7l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="2" y="14" width="16" height="4" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-          クリックしてアップロード
+    <div class="cs-field" style="max-width:240px">
+      <div class="cs-label" style="margin-bottom:8px">会社印</div>
+      <div id="cs-seal-preview" style="margin-bottom:10px;${c.companySeal ? '' : 'display:none'}">
+        <img src="${c.companySeal||''}" id="cs-seal-img" style="width:120px;height:120px;object-fit:contain;border:1px solid var(--border);border-radius:var(--r);padding:4px;background:#fff">
+        <div style="margin-top:6px">
+          <button class="btn-ghost btn-sm" style="color:var(--coral);font-size:11px" onclick="removeCompanySeal()">✕ 削除</button>
         </div>
       </div>
-      <div class="cs-field">
-        <div class="cs-label">会社の印影</div>
-        <div class="cs-seal-area" onclick="alert('印影画像をアップロードします')">
-          <svg viewBox="0 0 20 20" width="20" height="20"><path d="M10 3v10M6 7l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="2" y="14" width="16" height="4" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-          クリックしてアップロード
+      <label id="cs-seal-upload-label" style="${c.companySeal ? 'display:none' : ''}">
+        <div class="cs-seal-area" style="width:200px;height:120px;flex-direction:column">
+          <svg viewBox="0 0 20 20" width="24" height="24"><path d="M10 3v10M6 7l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="2" y="14" width="16" height="4" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+          <span style="font-size:12px;color:var(--muted)">クリックしてアップロード</span>
+          <span style="font-size:10px;color:var(--muted)">PNG / JPG（推奨：透過PNG）</span>
         </div>
-      </div>
+        <input type="file" accept="image/png,image/jpeg,image/gif" style="display:none" onchange="uploadCompanySeal(this)">
+      </label>
     </div>
   </div>
 </div>
@@ -3491,6 +3494,38 @@ function saveCompanySettings() {
   toast.textContent = '✓ 自社情報を保存しました';
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2500);
+}
+
+function uploadCompanySeal(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { alert('ファイルサイズは2MB以下にしてください'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    MY_COMPANY.companySeal = dataUrl;
+    // プレビュー表示
+    document.getElementById('cs-seal-img').src = dataUrl;
+    document.getElementById('cs-seal-preview').style.display = '';
+    document.getElementById('cs-seal-upload-label').style.display = 'none';
+    // 自動保存
+    saveCompanyToDB(MY_COMPANY);
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+    toast.textContent = '✓ 会社印をアップロードしました';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeCompanySeal() {
+  if (!confirm('会社印を削除しますか？')) return;
+  MY_COMPANY.companySeal = '';
+  document.getElementById('cs-seal-img').src = '';
+  document.getElementById('cs-seal-preview').style.display = 'none';
+  document.getElementById('cs-seal-upload-label').style.display = '';
+  saveCompanyToDB(MY_COMPANY);
 }
 
 function addSalesPerson() {
