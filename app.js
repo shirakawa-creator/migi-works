@@ -982,44 +982,51 @@ const VIEWS = {
 </div>`,
 
   // ── TEAM ───────────────────────────────────────────
-  team: () => `
+  team: () => {
+    const members = MY_COMPANY.salesPersons || [];
+    const colors = ['#3b7dd8','#00c896','#f5a623','#e85d4a','#6c63ff','#00a67a','#e91e8c','#ff6b35','#9c27b0','#009688'];
+    return `
 <div class="stat-grid g-3">
-  <div class="stat-card"><div class="stat-label">チームメンバー</div><div class="stat-val">${TEAM_MEMBERS.length}</div></div>
-  <div class="stat-card"><div class="stat-label">管理者</div><div class="stat-val">1</div></div>
-  <div class="stat-card"><div class="stat-label">今日のアクティブ</div><div class="stat-val" style="color:var(--acc)">3</div></div>
+  <div class="stat-card"><div class="stat-label">チームメンバー</div><div class="stat-val">${members.length}</div></div>
+  <div class="stat-card"><div class="stat-label">登録担当者</div><div class="stat-val" style="color:var(--acc)">${members.length}</div></div>
+  <div class="stat-card"><div class="stat-label">データソース</div><div class="stat-val" style="font-size:13px">自社情報設定</div></div>
 </div>
+
+${members.length === 0 ? `
+<div class="card" style="text-align:center;padding:48px 24px;color:var(--muted)">
+  <svg viewBox="0 0 40 40" width="48" height="48" style="margin:0 auto 16px;opacity:.3"><circle cx="20" cy="14" r="7" stroke="currentColor" stroke-width="2" fill="none"/><path d="M6 36c0-7.732 6.268-14 14-14s14 6.268 14 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+  <div style="font-weight:600;margin-bottom:8px">メンバーが登録されていません</div>
+  <div style="font-size:12px;margin-bottom:16px">自社情報設定の「営業担当者リスト」からメンバーを追加してください</div>
+  <button class="btn-primary btn-sm" onclick="showView('company-settings',document.querySelector('[data-view=company-settings]'))">自社情報設定を開く →</button>
+</div>` : `
 <div class="team-grid">
-  ${TEAM_MEMBERS.map(m=>`
+  ${members.map((name, i) => {
+    const initials = name.replace(/\s+/g,'').slice(-2) || name.slice(0,2);
+    const color = colors[i % colors.length];
+    const isCurrentUser = STATE.currentUser?.name === name || STATE.currentUser?.email?.startsWith(name.split(' ')[0]);
+    return `
   <div class="team-card">
-    <div class="team-av" style="background:${m.color}">${m.initials}</div>
-    <div class="team-name">${m.name}</div>
-    <div class="team-email">${m.email}</div>
-    <span class="team-role-badge ${roleClass(m.role)}">${m.role}</span>
-    <div class="text-muted" style="margin-top:10px;font-size:10px">最終ログイン: ${m.lastLogin}</div>
-    ${m.id !== STATE.currentUser?.id
-      ? `<div style="margin-top:10px;display:flex;gap:6px;justify-content:center">
-          <button class="btn-outline btn-sm" onclick="alert('権限変更フォームを開きます')">権限変更</button>
-          <button class="btn-ghost btn-sm" style="color:var(--coral)" onclick="confirmRemove('${m.name}')">削除</button>
-        </div>`
-      : `<div class="badge b-green" style="margin-top:10px">あなた</div>`}
-  </div>`).join('')}
-</div>
-<div class="card">
+    <div class="team-av" style="background:${color}">${initials}</div>
+    <div class="team-name">${name}</div>
+    <div class="team-email" style="color:var(--muted);font-size:11px">営業担当</div>
+    <span class="team-role-badge sales">営業</span>
+    ${isCurrentUser ? `<div class="badge b-green" style="margin-top:10px">あなた</div>` : ''}
+  </div>`;
+  }).join('')}
+</div>`}
+
+<div class="card" style="margin-top:16px">
   <div class="card-header">
-    <div class="card-title">招待リンク</div>
+    <div class="card-title">担当者を追加・編集する</div>
     <div class="card-actions">
-      <button class="btn-primary btn-sm" onclick="openModal('invite-modal')">＋ メンバーを招待</button>
+      <button class="btn-primary btn-sm" onclick="showView('company-settings',document.querySelector('[data-view=company-settings]'))">自社情報設定を開く</button>
     </div>
   </div>
   <div class="card-body">
-    <p class="text-muted mb-16">以下のURLを共有することでチームメンバーを招待できます。</p>
-    <div style="display:flex;gap:10px;align-items:center">
-      <input class="input" value="https://app.migiworks.co.jp/invite/abc123xyz" readonly style="flex:1">
-      <button class="btn-outline btn-sm" onclick="alert('URLをコピーしました ✓')">コピー</button>
-      <button class="btn-ghost btn-sm" onclick="alert('新しいURLを生成しました')">再生成</button>
-    </div>
+    <p class="text-muted" style="font-size:12px">チームメンバーは「自社情報設定 → 営業担当者リスト」で管理されています。追加・削除はそちらから行ってください。</p>
   </div>
-</div>`,
+</div>`;
+  },
 };
 
 // ─── ATTENDANCE MONTHLY VIEW ─────────────────────────
