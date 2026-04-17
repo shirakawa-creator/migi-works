@@ -194,6 +194,7 @@ function dbRowToContract(r) {
     clientLower: r.client_lower||'', clientLowerDept: r.client_lower_dept||'', clientLowerJobType: r.client_lower_job_type||'',
     start: r.start_date, end: r.end_date,
     extendStatus: r.extend_status||'未確認', extendMonths: r.extend_months||'',
+    extendStartDate: r.extend_start_date||'', extendEndDate: r.extend_end_date||'', extendPrevEnd: r.extend_prev_end||'',
     monthly: r.monthly||0, clientLowerMonthly: r.client_lower_monthly||0,
     minHours: r.min_hours||140, maxHours: r.max_hours||180,
     overRate: r.over_rate||0, underRate: r.under_rate||0,
@@ -211,6 +212,7 @@ function contractToDbRow(c) {
     client_lower: c.clientLower||'', client_lower_dept: c.clientLowerDept||'', client_lower_job_type: c.clientLowerJobType||'',
     start_date: c.start, end_date: c.end,
     extend_status: c.extendStatus||'未確認', extend_months: String(c.extendMonths||''),
+    extend_start_date: c.extendStartDate||null, extend_end_date: c.extendEndDate||null, extend_prev_end: c.extendPrevEnd||null,
     monthly: c.monthly||0, client_lower_monthly: c.clientLowerMonthly||0,
     min_hours: c.minHours||140, max_hours: c.maxHours||180,
     over_rate: c.overRate||0, under_rate: c.underRate||0,
@@ -1858,11 +1860,25 @@ function openDocWithSettings(type, contractId) {
     document.body.appendChild(div.firstElementChild);
   }
 
-  // 契約期間から開始・終了月を初期値として設定
-  const contractStartYear  = c ? parseInt(c.start.slice(0,4)) : yyyy;
-  const contractStartMonth = c ? parseInt(c.start.slice(5,7)) : today.getMonth()+1;
-  const contractEndYear    = c ? parseInt(c.end.slice(0,4))   : yyyy;
-  const contractEndMonth   = c ? parseInt(c.end.slice(5,7))   : today.getMonth()+1;
+  // 対象期間の初期値：延長済みなら延長期間、そうでなければ契約期間
+  let contractStartYear, contractStartMonth, contractEndYear, contractEndMonth;
+  let periodLabel = '';
+
+  if (c.extendStatus === '延長する' && c.extendStartDate && c.extendEndDate) {
+    // 延長期間を初期値にする
+    contractStartYear  = parseInt(c.extendStartDate.slice(0,4));
+    contractStartMonth = parseInt(c.extendStartDate.slice(5,7));
+    contractEndYear    = parseInt(c.extendEndDate.slice(0,4));
+    contractEndMonth   = parseInt(c.extendEndDate.slice(5,7));
+    periodLabel = '前回延長した期間';
+  } else {
+    // 契約期間を初期値にする
+    contractStartYear  = parseInt(c.start.slice(0,4));
+    contractStartMonth = parseInt(c.start.slice(5,7));
+    contractEndYear    = parseInt(c.end.slice(0,4));
+    contractEndMonth   = parseInt(c.end.slice(5,7));
+    periodLabel = '契約期間';
+  }
 
   document.getElementById('doc-settings-title').textContent = `${type}の発行設定`;
   document.getElementById('doc-settings-body').innerHTML = `
@@ -1933,7 +1949,9 @@ function openDocWithSettings(type, contractId) {
       const em = parseInt(document.getElementById('dss-end-month')?.value)||contractEndMonth;
       const months = (ey - sy) * 12 + (em - sm) + 1;
       const hint = document.getElementById('dss-period-hint');
-      if (hint) hint.textContent = months > 0 ? `→ ${months}ヶ月分の注文書` : '期間が正しくありません';
+      if (hint) hint.textContent = months > 0
+        ? `→ ${months}ヶ月分（${periodLabel}）`
+        : '期間が正しくありません';
     };
     setTimeout(() => {
       ['dss-start-year','dss-start-month','dss-end-year','dss-end-month'].forEach(id => {
@@ -4188,11 +4206,19 @@ function confirmExtend(contractId) {
   if (!newEnd) { alert('終了日を選択してください'); return; }
   const c = CONTRACTS.find(x => x.id === contractId);
   if (c) {
+    // 延長前の終了日を保存 → 注文書の初期期間に使う
+    const prevEnd = c.end;
+    // 延長開始日 = 延長前終了日の翌月1日
+    const prevEndDate = new Date(prevEnd);
+    const extStartDate = new Date(prevEndDate.getFullYear(), prevEndDate.getMonth() + 1, 1);
+    c.extendPrevEnd = prevEnd;
+    c.extendStartDate = `${extStartDate.getFullYear()}-${String(extStartDate.getMonth()+1).padStart(2,'0')}-01`;
+    c.extendEndDate = newEnd;
     c.end = newEnd;
     c.extendStatus = '延長する';
+    saveContractToDB(c);
   }
   closeModal('extend-modal');
-  // Re-render contracts view if active
   if (STATE.currentView === 'contracts') {
     document.getElementById('content-area').innerHTML = renderContractsView();
   }
